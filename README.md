@@ -57,7 +57,7 @@ Alternatively, researchers can run the following files individually in order:
 All analyses and computations were carried out on 2024 MacBook Pro with an Apple M4 Pro chip, 48GB memory, and Sequoia 15.7 operating system.
 
 All analyses were originally conducted using R version 4.5.1 and the package versions recorded in the attached session info at the bottom of the README. 
-```
+
 
 ## Acknowledgements 
 
@@ -67,7 +67,9 @@ For helpful feedback and background information, the author would like to thank 
 ## Session info:
 
 ```
-> sessionInfo()
+
+sessionInfo()
+
 R version 4.5.1 (2025-06-13)
 Platform: aarch64-apple-darwin20
 Running under: macOS Sequoia 15.7.2
@@ -77,13 +79,13 @@ BLAS:   /System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/ve
 LAPACK: /Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
 
 locale:
-[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+ en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
 
 time zone: America/Chicago
 tzcode source: internal
 
 attached base packages:
-[1] stats     graphics  grDevices utils     datasets  methods   base     
+stats     graphics  grDevices utils     datasets  methods   base     
 
 other attached packages:
  [1] scales_1.4.0        gompertztrunc_0.1.2 ipumsr_0.9.0        RColorBrewer_1.1-3  LexisPlotR_0.4.0    gt_1.1.0            fixest_0.12.1      
@@ -100,4 +102,5 @@ loaded via a namespace (and not attached):
 [36] timechange_0.3.0    ragg_1.5.0          zoo_1.8-14          hms_1.1.3           evaluate_1.0.5      knitr_1.50          haven_2.5.5        
 [43] rlang_1.1.6         Rcpp_1.1.0          zeallot_0.2.0       glue_1.8.0          xml2_1.4.0          rstudioapi_0.17.1   R6_2.6.1           
 [50] systemfonts_1.2.3   fs_1.6.6
+
 ```
