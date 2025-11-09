@@ -1,0 +1,46 @@
+---
+title: "Age heaping analysis"
+author: Casey Breen
+---
+
+Summary: investigate age heaping 
+
+```{r}
+## library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## read in dmf 
+dmf <- fread(here("data", "censoc_dmf_clean.csv"))
+
+dmf_xwalk <- fread(here("data", "dmf_ssn_histid_v2_1_crosswalk.csv"))
+
+dmf_clean <- dmf_clean %>% 
+  inner_join(dmf_xwalk)
+```
+
+```{r}
+bunmd <- fread(here("data", "bunmd_v2.csv"))
+
+```
+
+
+```{r}
+dmf_clean_joined <- dmf_clean %>% 
+  left_join(bunmd %>% select(ssn, dyear, byear, death_age), by = "ssn")
+```
+
+
+```{r}
+dmf_clean_joined %>% 
+  filter(dyear.x %in% 1988:2005) %>% 
+  summarize(mean(dyear.x == dyear.y, na.rm = T))
+
+dmf_clean_joined %>% 
+  filter(dyear.x %in% 1988:2005) %>% 
+  mutate(diff_deathage = death_age.x - death_age.y,
+         diff_dyear = dyear.x - dyear.y,
+         diff_byear = byear.x - byear.y) %>% 
+  count(diff_deathage)
+```
+

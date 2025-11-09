@@ -1,0 +1,60 @@
+---
+title: "Calculate Gompertz Models"
+author: Casey Breen
+---
+
+Summary: calculate the Gompertz models 
+
+
+```{r}
+## library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## read in dmf 
+dmf <- fread(here("data", "censoc_dmf_clean.csv"))
+
+
+```
+
+
+```{r}
+gompertz_white <- gompertztrunc::gompertz_mle(death_age ~ 1, data = dmf_white) 
+gompertz_black <- gompertztrunc::gompertz_mle(death_age ~ 1, data = dmf_black)
+```
+
+
+```{r}
+b_black <- gompertz_black$results$coef[[1]]
+M_black <- gompertz_black$results$coef[[2]]
+hx_black <- hx_calc(b = b_black, M = M_black, x = 0:121)
+
+b_white <- gompertz_white$results$coef[[1]]
+M_white <- gompertz_white$results$coef[[2]]
+hx_white<- hx_calc(b = b_white, M = M_white, x = 0:121)
+
+mortality_crossover_1906_1915 <- tibble(year = 0:121, `White Americans` = hx_white, `Black Americans` = hx_black) %>% 
+  pivot_longer(-year) %>% 
+  filter(year %in% 65:100) %>% 
+  ggplot(aes(x = year, y = log(value), color = name, shape = name)) + 
+    geom_line() + 
+  geom_point(size = 2.5, fill = "white") + 
+  theme(legend.position = "bottom") + 
+  labs(x = "age",
+       y = "Log(Hx)",
+       title = "Mortality Crossovers (Men)",
+       subtitle = "Cohorts of 1906-1915") +
+  ggsci::scale_color_lancet() + 
+  theme_cowplot() + 
+  scale_shape_manual(values = c(21, 24)) + 
+  geom_vline(xintercept  = 90, linetype = "dashed") + 
+   theme(
+    legend.title=element_blank(),
+    legend.position = c(.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", size = .5, linetype = "solid"))
+
+ggsave(plot = mortality_crossover_1906_1915, filename = here("figures_brief", "bw_crossover_gompertz_1906_1915.png"), width = 7, height = 5, bg = "white")
+```

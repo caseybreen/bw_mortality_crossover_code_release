@@ -1,0 +1,78 @@
+---
+title: "BW Crossover"
+author: Casey Breen
+---
+
+Summary: Run BW-crossover using exact byear 
+
+```{r}
+## library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## read in dmf 
+dmf <- fread(here("data", "censoc_dmf_clean.csv"))
+```
+
+
+```{r}
+dmf_filter <- dmf %>% 
+  filter(byear %in% c(1890:1905)) %>% 
+  filter(byeardiff_census_minus_dmf == 0)
+```
+
+
+```{r}
+## calculate point estimates for ln qx 
+ln_qx_point_estimate <- dmf_filter %>% 
+  calculate_ln_qx() %>% 
+  group_by(death_age, race) %>%
+  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE))
+
+# Bootstrap and average hazards across byear within each bootstrap
+boot_df_1 <- replicate(100, {
+  dmf_filter %>%
+    sample_frac(replace = TRUE) %>%
+    calculate_ln_qx() %>%
+    group_by(death_age, race) %>%
+    summarize(ln_qx = mean(ln_qx, na.rm = TRUE), .groups = "drop")
+}, simplify = FALSE) %>%
+  bind_rows(.id = "bootstrap_id")
+
+# Summarize hazards across bootstraps
+hazard_summary_1 <- boot_df_1 %>%
+  group_by(death_age, race) %>%
+  summarize(
+    mean_hazard = mean(ln_qx, na.rm = TRUE),
+    lower_ci = quantile(ln_qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(ln_qx, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Plot
+pooled_bwcrossover <- hazard_summary_1 %>%
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  ggplot(aes(x = death_age, y = mean_hazard, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  geom_vline(xintercept = 86, linetype = "dashed") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    x = "Age", y = "Log(Mx)",
+    title = "Mortality Crossovers (Men)",
+    subtitle = "Pooled cohorts of 1890-1905"
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", size = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  )
+
+# Save plots
+ggsave(plot = pooled_bwcrossover, filename = here("figures_brief", "bw_crossover_exact_age.png"), width = 7.5, height = 5, bg = "white")
+```

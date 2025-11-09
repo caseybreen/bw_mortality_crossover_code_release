@@ -1,0 +1,185 @@
+---
+title: "Age heaping analysis"
+author: Casey Breen
+---
+
+Summary: investigate age heaping 
+
+```{r}
+## library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## read in dmf 
+dmf <- fread(here("data", "censoc_dmf_clean.csv"))
+```
+
+
+```{r}
+## tabulated birth year 
+tabulated_byear <- dmf %>% 
+  filter(byear %in% c(1884:1920)) %>% 
+  group_by(race) %>% 
+  count(byear)
+
+## create_plot
+heaping_birth_year_plot <- tabulated_byear %>% 
+  filter(!is.na(race)) %>% 
+  mutate(alpha = case_when(byear %in% seq(1885, 1920, by = 5) ~ 1,
+                           byear == 1884 ~ 0,
+                           TRUE ~ 0.05)) %>% 
+  ggplot(aes(x = byear, y = n, alpha = alpha)) + 
+  geom_col(color = "black", fill = "grey47") + 
+  scale_y_continuous(label = scales::comma) + 
+  cowplot::theme_cowplot() + 
+  facet_wrap(~race, ncol = 2, scales="free") + 
+  theme(legend.position = "NULL") + 
+  labs(x = "Birth Year",
+       y = "Count of Deaths") + 
+  theme(
+    strip.background = element_rect(fill = "white", color = "black", linewidth = 0.8),
+    strip.text = element_text(size = 11, face = "bold", color = "black"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.background = element_rect(fill = "#f9f9f9", color = NA),
+    panel.grid = element_line(color = "grey95"),
+    panel.spacing = unit(1.5, "lines"),
+    legend.position = "NULL",
+    legend.justification = "center",  # centers the whole legend box
+    legend.title = element_text(size = 13, hjust = 0.5, vjust = 1, margin = margin(b = 4)),
+    legend.text = element_text(size = 11),
+    axis.title.x = element_text(face = "bold")
+  ) 
+```
+
+```{r}
+## tabulated birth year 
+tabulated_census_age <- dmf %>% 
+  filter(byear %in% c(1884:1920)) %>% 
+  group_by(race) %>% 
+  count(census_age)
+
+## create_plot
+heaping_census_age_plot <- tabulated_census_age %>% 
+  filter(!is.na(race)) %>% 
+  mutate(alpha = case_when(census_age %in% seq(20, 55, by = 5) ~ 1,
+                           census_age == 1884 ~ 0,
+                           TRUE ~ 0.05)) %>% 
+  ggplot(aes(x = census_age, y = n, alpha = alpha)) + 
+  geom_col(color = "black", fill = "grey47") + 
+  scale_y_continuous(label = scales::comma) + 
+  cowplot::theme_cowplot() + 
+  facet_wrap(~race, ncol = 2, scales="free") + 
+  theme(legend.position = "NULL") + 
+  labs(x = "1940 Census Age",
+       y = "Count of Deaths") + 
+  theme(
+    strip.background = element_rect(fill = "white", color = "black", linewidth = 0.8),
+    strip.text = element_text(size = 11, face = "bold", color = "black"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.background = element_rect(fill = "#f9f9f9", color = NA),
+    panel.grid = element_line(color = "grey95"),
+    panel.spacing = unit(1.5, "lines"),
+    legend.position = "NULL",
+    legend.justification = "center",  # centers the whole legend box
+    legend.title = element_text(size = 13, hjust = 0.5, vjust = 1, margin = margin(b = 4)),
+    legend.text = element_text(size = 11),
+    axis.title.x = element_text(face = "bold")
+  ) 
+```
+
+
+```{r}
+## tabulated birth year 
+tabulated_dyear <- dmf %>% 
+  filter(dyear %in% c(1975:2005)) %>% 
+  group_by(race) %>% 
+  count(dyear)
+
+## create_plot
+heaping_death_year_plot <- tabulated_dyear %>% 
+  filter(!is.na(race)) %>% 
+  mutate(alpha = case_when(dyear %in% seq(1975, 2005, by = 5) ~ 1,
+                           dyear == 1884 ~ 0,
+                           TRUE ~ 0.05)) %>% 
+  ggplot(aes(x = dyear, y = n, alpha = alpha)) + 
+  geom_col(color = "black", fill = "grey47") + 
+  scale_y_continuous(label = scales::comma) + 
+  cowplot::theme_cowplot() + 
+  facet_wrap(~race, ncol = 2, scales="free") + 
+  labs(x = "Death Year",
+       y = "Count of Deaths") + 
+  theme(
+    strip.background = element_rect(fill = "white", color = "black", linewidth = 0.8),
+    strip.text = element_text(size = 11, face = "bold", color = "black"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.background = element_rect(fill = "#f9f9f9", color = NA),
+    panel.grid = element_line(color = "grey95"),
+    panel.spacing = unit(1.5, "lines"),
+    legend.position = "NULL",
+    legend.justification = "center",  # centers the whole legend box
+    legend.title = element_text(size = 13, hjust = 0.5, vjust = 1, margin = margin(b = 4)),
+    legend.text = element_text(size = 11),
+    axis.title.x = element_text(face = "bold")
+  ) 
+```
+
+
+```{r}
+## Age heaping figures 
+heaping_combined_plot <- cowplot::plot_grid(
+  heaping_birth_year_plot,
+  NULL,
+  heaping_census_age_plot,
+  NULL,
+  heaping_death_year_plot,
+  nrow = 5,
+  rel_heights = c(1, 0.1, 1, 0.1, 1)
+)
+
+## Plot death year 
+ggsave(plot = heaping_combined_plot, filename = here("figures_brief", "age_heaping_plot.png"), width = 8, height = 8, bg = "white")
+```
+
+```{r}
+tabulated_byear <- dmf %>% 
+  filter(!is.na(race)) %>% 
+  filter(byear %in% c(1884:1920)) %>% 
+  filter(death_age %in% c(0:100)) %>% 
+  mutate(terminal_year = case_when(
+    byear %in% c(1885, 1890, 1895, 1900, 1905, 1910, 1915, 1920) ~ 1,
+    TRUE ~ 0
+  )) %>% 
+  group_by(death_age, race) %>% 
+  summarize(prop = mean(terminal_year))
+
+dmf %>% 
+  filter(!is.na(race)) %>% 
+  filter(byear %in% c(1884:1920)) %>% 
+  filter(death_age %in% c(0:100)) %>% 
+  mutate(terminal_year = case_when(
+    byear %in% c(1885, 1890, 1895, 1900, 1905, 1910, 1915, 1920) ~ 1,
+    TRUE ~ 0
+  )) %>% 
+  summarize(mean(terminal_year))
+
+age_heaping_age_plot <- tabulated_byear %>% 
+  filter(death_age %in% 70:100) %>% 
+  ggplot(aes(x = death_age, y = prop, color = race)) + 
+  geom_point(size = 2) + 
+  geom_line() +
+  scale_y_continuous(labels = scales::percent, limits = c(0, .50)) + 
+  geom_hline(yintercept = .2, linetype = "dashed") + 
+  theme_cowplot() + 
+  ggsci::scale_color_lancet() + 
+  theme(legend.position = "bottom", legend.title = element_blank()) + 
+  labs(x = "Death Age",
+       y = "Birth year: terminal digit \n (0 or 5)")
+
+ggsave(plot = age_heaping_age_plot, filename = here("figures_brief", "age_heaping_death_age.png"), width = 6, height = 4, bg = "white")
+```
+
+
+
+
+
+

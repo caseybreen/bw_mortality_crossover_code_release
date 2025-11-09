@@ -1,0 +1,71 @@
+---
+title: "graveyard"
+output: html_document
+---
+
+
+
+```{r}
+pooled_crossover <- cowplot::plot_grid(pooled_bwcrossover, pooled_bwcrossover_nonheaped, ncol = 1, labels = "auto")
+
+ggsave(plot = pooled_crossover, filename = here("figures/bw_crossover_pooled.png"), width = 8, height = 10, bg = "white")
+```
+
+
+```{r}
+# Step 1: Reshape hazard_summary_1 to wide form
+relative_death_prob_df <- ln_qx_uncertainty_point_estimate %>%
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  select(death_age, race, mean_hazard) %>%
+  pivot_wider(names_from = race, values_from = mean_hazard) %>%
+  mutate(
+    relative_death_ratio = `Black Americans` - `White Americans`,
+    hazard_ratio = exp(relative_death_ratio)  # exponentiate to get ratio
+  )
+
+# Step 2: Plot hazard ratio
+ggplot(relative_death_prob_df, aes(x = death_age, y = hazard_ratio)) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_line(color = "black") +
+  theme_cowplot() +
+  labs(
+    x = "Age", 
+    y = "Ratio (Black / White)",
+    title = "Relative Mortality Risk (Black vs White Men)",
+    subtitle = "Pooled cohorts of 1890–1905"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "none"
+  ) + 
+  ylim(0.8, 1.2)
+```
+
+
+
+```{r}
+# Plot
+ln_qx_uncertainty_point_estimate %>%
+  filter(death_age %in% 75:100, race %in% c("Black Americans")) %>%
+  ggplot(aes(x = death_age, y = ln_qx_point_estimate, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  geom_vline(xintercept = 86, linetype = "dashed") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    x = "Age", y = "Log(Mx)",
+    title = "Mortality Crossovers (Men)",
+    subtitle = "Pooled cohorts of 1890-1905" 
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", size = 0.5, linetype = "solid"),
+    legend.title = element_blank()) + 
+  geom_smooth(method = "lm")
+```
+

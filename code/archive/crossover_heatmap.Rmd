@@ -1,0 +1,177 @@
+---
+title: "Crossover Heatmap"
+author: Casey Breen
+---
+
+
+```{r}
+## Library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## Read in dmf 
+dmf_new <- fread(here("data/censoc_dmf_v4.csv"))
+
+dmf_new
+
+dmf <- dmf %>% 
+  filter(link_abe_exact_conservative == 1) %>% 
+  left_join(dmf_new %>% select(histid = HISTID, weight))
+  
+dmf <- dmf %>% 
+  janitor::clean_names() %>%
+  mutate(race = case_when(
+    race == 100 ~ "White Americans",
+    race == 200 ~ "Black Americans"
+  )) %>%
+  filter(link_abe_exact_conservative == 1) %>%
+  filter(bpl < 15000)
+
+
+dmf %>% filter(byear %in% 1890:1905 & death_age %in% c(65:100)) %>% group_by(death_age) %>% summarize(mean(is.na(weight))) 
+
+dmf %>% filter(byear %in% 1890:1905 & death_age %in% c(65:100)) %>% filter(is.na(weight)) %>% select(byear, dyear, death_age) %>% count(byear)
+
+dmf %>% filter(byear %in% 1890:1905 & death_age %in% c(65:100)) %>% filter(is.na(weight_conservative)) %>% select(byear, dyear, death_age) %>% count(byear)
+
+
+
+```
+
+
+```{r}
+## Function to calculate qx that can be bootstrapped 
+## All cells have at least one death for 1975-2005  
+calculate_ln_qx_weighted <- function(data) {
+  data %>%
+    group_by(byear, death_age, race) %>%
+    summarize(deaths = sum(weight_conservative), .groups = "drop", ) %>%
+    arrange(race, byear, death_age) %>%  ## data organized for cumsum which comes later
+    group_by(race, byear) %>%
+    mutate(
+      lx = sum(deaths) - lag(cumsum(deaths), default = 0),
+      qx = deaths / lx,
+      ln_qx = log(qx) ## this will give infinity unless there is at least one death per cell (!)
+    ) %>%
+    ungroup()
+} 
+
+dmf_filter <- dmf_filter %>% 
+  mutate(weight = weight / mean(weight, na.rm = T)) %>% 
+  mutate(weight = case_when(is.na(weight) ~ 1, TRUE ~ weight))
+
+ln_qx_point_estimate <- dmf_filter %>% 
+  calculate_ln_qx() %>% 
+  group_by(death_age, race) %>%
+  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE))
+
+ln_qx_point_estimate_weighted <- dmf_filter %>% 
+  calculate_ln_qx_weighted() %>% 
+  group_by(death_age, race) %>%
+  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE))
+
+# Bootstrap and average hazards across byear within each bootstrap
+boot_df_1 <- replicate(100, {
+  dmf_filter %>%
+    sample_frac(replace = TRUE) %>%
+    calculate_ln_qx_weighted() %>%
+    group_by(death_age, race) %>%
+    summarize(ln_qx = mean(ln_qx, na.rm = TRUE), .groups = "drop")
+}, simplify = FALSE) %>%
+  bind_rows(.id = "bootstrap_id")
+
+# Summarize hazards across bootstraps
+ln_qx_uncertainty <- boot_df_1 %>%
+  group_by(death_age, race) %>%
+  summarize(
+    mean_hazard = mean(ln_qx, na.rm = TRUE),
+    lower_ci = quantile(ln_qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(ln_qx, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  ) 
+
+ln_qx_uncertainty_point_estimate <- ln_qx_uncertainty %>% 
+  left_join(ln_qx_point_estimate_weighted, by = c("death_age", "race"))
+
+# Plot
+pooled_bwcrossover <- ln_qx_uncertainty_point_estimate %>%
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  ggplot(aes(x = death_age, y = ln_qx_point_estimate, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  geom_vline(xintercept = 86, linetype = "dashed") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    x = "Age",
+    y = "Probability of death (Log Scale)",
+    title = "Mortality Crossovers (Men)",
+    subtitle = "Pooled cohorts of 1890-1905"
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", size = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  )
+
+# Save plots
+ggsave(plot = pooled_bwcrossover, filename = here("figures/bw_crossover_1890_1905.png"), width = 7.5, height = 5, bg = "white")
+```
+
+
+
+
+
+
+```{r}
+weight_byear_death_age_black <- dmf_filter %>%
+  filter(!is.na(weight)) %>%
+  filter(race == "Black Americans") %>% 
+  group_by(byear, death_age) %>% 
+  summarize(mean_weight = mean(weight), n())
+
+
+# Assuming your data is in a data frame called df
+ggplot(weight_byear_death_age_black, aes(x = byear, y = death_age, fill = mean_weight)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "plasma", limits = c(0, 5)) +
+  labs(
+    y = "Death Age",
+    x = "Birth Cohort",
+    fill = "Mean Weight"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(angle = 0, hjust = 1)
+  )
+  
+```
+
+
+```{r}
+weight_byear_death_age_white <- dmf_filter %>%
+  filter(!is.na(weight)) %>%
+  filter(race == "White Americans") %>% 
+  group_by(byear, death_age) %>% 
+  summarize(mean_weight = mean(weight), n())
+
+
+# Assuming your data is in a data frame called df
+ggplot(weight_byear_death_age_white, aes(x = byear, y = death_age, fill = mean_weight)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "plasma") +
+  labs(
+    x = "Death Age",
+    y = "Cohort (int)",
+    fill = "Mean Weight"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(angle = 0, hjust = 1)
+  )
+```
+

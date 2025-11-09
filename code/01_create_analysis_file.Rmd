@@ -1,0 +1,35 @@
+---
+title: "Create Analysis file"
+author: Casey Breen
+---
+
+Summary: Clean up data files 
+
+```{r}
+## library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## read in dmf 
+dmf <- fread(here("data", "censoc_dmf_v2_1_linked_with_census.csv"))
+
+## recode race 
+## restrict to conservative matches 
+## restrict to people born in the US 
+dmf <- dmf %>%
+  janitor::clean_names() %>%
+  mutate(race = case_when(
+    race == 100 ~ "White Americans",
+    race == 200 ~ "Black Americans"
+  )) %>%
+  filter(link_abe_exact_conservative == 1) %>%
+  filter(bpl < 15000) %>% 
+  filter(!is.na(race))
+
+## dmf clean 
+dmf_clean <- dmf %>%
+  select(histid, byear, dyear, death_age, race, link_abe_exact_conservative, byeardiff_census_minus_dmf, bpl, census_age)
+
+fwrite(dmf_clean, here("data", "censoc_dmf_clean.csv"))
+```
+
