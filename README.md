@@ -21,7 +21,7 @@ This repository includes code to replicate all figures and tables in the paper. 
 
 1. Clone this repository
 2. Download the `data.zip` file from the [OSF repository](https://osf.io/wcgfm/overview?view_only=d60dbcbb7b52490f808af829be1685d5), move it to the root level of this repository, and unzip it. 
-2. Run the `00_run_all.Rmd` script, which will run all code (or run scripts `01` to `21` individually)
+2. Run the `00_run_all.Rmd` script, which will run all code (or run scripts `01` to `4` individually)
 
 ### Data 
 
