@@ -10,7 +10,7 @@ Summary: Clean up data files
 library(here)
 source(here("code", "helpers.R"))
 
-## read in dmf 
+## read in DMF 
 dmf <- fread(here("data", "censoc_dmf_v2_1_linked_with_census.csv"))
 
 ## recode race 
@@ -26,9 +26,17 @@ dmf <- dmf %>%
   filter(bpl < 15000) %>% 
   filter(!is.na(race))
 
-## dmf clean 
+## DMF clean 
 dmf_clean <- dmf %>%
-  select(histid, byear, dyear, death_age, race, link_abe_exact_conservative, byeardiff_census_minus_dmf, bpl, census_age)
+  select(histid, weight, weight_conservative, byear, dyear, death_age, race, link_abe_exact_conservative, byeardiff_census_minus_dmf, bpl, census_age)
+
+
+## Read in dmf 
+dmf_weights <- fread(here("data/censoc_dmf_v4.csv"))
+
+
+dmf_clean <- dmf_clean %>% 
+  left_join(dmf_weights %>% select(histid = HISTID, weight_nchs = weight))
 
 fwrite(dmf_clean, here("data", "censoc_dmf_clean.csv"))
 ```

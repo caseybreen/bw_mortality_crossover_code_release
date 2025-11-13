@@ -46,17 +46,58 @@ recode_education <- function(df, educ_var) {
     select(-educ_variable)
   return(df)
 }
+  
+## hx calc
+hx_calc <- function(x, b, M) {
+    hx = b * exp(b*(x - M))
+    return(hx)
+  }
 
-calculate_ln_qx <- function(data) {
+
+## calculate ln_qx 
+## Function to calculate qx that can be bootstrapped 
+## All cells have at least one death for 1975-2005  
+# calculate_ln_qx <- function(data) {
+#   data %>%
+#     group_by(byear, death_age, race) %>%
+#     summarize(deaths = n(), .groups = "drop") %>%
+#     arrange(race, byear, death_age) %>%  ## data organized for cumsum which comes later
+#     group_by(race, byear) %>%
+#     mutate(
+#       lx = sum(deaths) - lag(cumsum(deaths), default = 0),
+#       qx = deaths / lx,
+#       ln_qx = log(qx) ## this will give infinity unless there is at least one death per cell (!)
+#     ) %>%
+#     ungroup()
+# }
+
+calculate_qx <- function(data, weight_var = NULL) {
+  
+  # If a weight variable is supplied, use weighted sum.
+  if (!is.null(weight_var)) {
+    data <- data %>%
+      group_by(byear, death_age, race) %>%
+      summarize(
+        deaths = sum(.data[[weight_var]], na.rm = TRUE),
+        .groups = "drop"
+      )
+  } else {   # If not, use unweighted counts.
+    data <- data %>%
+      group_by(byear, death_age, race) %>%
+      summarize(
+        deaths = n(),   # unweighted
+        .groups = "drop"
+      )
+  }
+  
+  ## calculate lx, qx, and then ln_qx 
   data %>%
-    group_by(byear, death_age, race) %>%
-    summarize(deaths = n(), .groups = "drop") %>%
-    arrange(race, byear, death_age) %>%  ## data organized for cumsum which comes later
+    arrange(race, byear, death_age) %>%
     group_by(race, byear) %>%
     mutate(
-      lx = sum(deaths) - lag(cumsum(deaths), default = 0),
-      qx = deaths / lx,
-      ln_qx = log(qx) ## this will give infinity unless there is at least one death per cell (!)
+      lx    = sum(deaths) - lag(cumsum(deaths), default = 0),
+      qx    = deaths / lx,
+      ln_qx = log(qx)
     ) %>%
     ungroup()
 }

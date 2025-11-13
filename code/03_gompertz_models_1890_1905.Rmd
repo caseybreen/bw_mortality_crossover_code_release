@@ -64,7 +64,7 @@ mortality_crossover_1890_1905 <- tibble(year = 0:121, `White Americans` = hx_whi
     legend.margin = margin(6, 6, 6, 6),
     legend.background = element_rect(color = "black", size = .5, linetype = "solid"))
 
-ggsave(plot = mortality_crossover_1890_1905, filename = here("figures_brief", "bw_crossover_gompertz_1890_1905.png"), width = 7, height = 5, bg = "white")
+# ggsave(plot = mortality_crossover_1890_1905, filename = here("figures", "bw_crossover_gompertz_1890_1905.png"), width = 7, height = 5, bg = "white")
 ```
 
 ## cohorts of 1906-1915
@@ -118,7 +118,7 @@ mortality_crossover_1906_1915 <- tibble(year = 0:121, `White Americans` = hx_whi
     legend.margin = margin(6, 6, 6, 6),
     legend.background = element_rect(color = "black", size = .5, linetype = "solid"))
 
-ggsave(plot = mortality_crossover_1906_1915, filename = here("figures_brief", "bw_crossover_gompertz_1906_1915.png"), width = 7, height = 5, bg = "white")
+# ggsave(plot = mortality_crossover_1906_1915, filename = here("figures_brief", "bw_crossover_gompertz_1906_1915.png"), width = 7, height = 5, bg = "white")
 ```
 
 
@@ -126,6 +126,6 @@ ggsave(plot = mortality_crossover_1906_1915, filename = here("figures_brief", "b
 ```{r}
 crossover_gompertz_combined <- cowplot::plot_grid(mortality_crossover_1890_1905, mortality_crossover_1906_1915, labels = "AUTO")
 
-ggsave(plot = crossover_gompertz_combined, filename = here("figures_brief", "bw_crossover_gompertz_combined.png"), width = 12, height = 5, bg = "white")
+ggsave(plot = crossover_gompertz_combined, filename = here("figures", "appendix_bw_crossover_gompertz_combined.png"), width = 12, height = 5, bg = "white")
 ```
 

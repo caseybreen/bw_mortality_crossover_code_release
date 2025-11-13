@@ -1,0 +1,31 @@
+---
+title: "Crossover Heatmap"
+author: Casey Breen
+---
+
+Summary: Estimate crossover using census weights 
+
+```{r}
+## Library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## Read in dmf 
+dmf <- fread(here("data", "censoc_dmf_clean.csv"))
+
+dmf_filter <- dmf %>% filter(byear %in% 1890:1905)
+```
+
+
+
+```{r}
+plot_grid(pooled_bwcrossover_census_weights, pooled_bwcrossover_census_weights_mortality_ratio, pooled_bwcrossover_nchs_weights, pooled_bwcrossover_nchs_weights_mortality_ratio)
+
+
+# Save plots
+ggsave(plot = pooled_bwcrossover_nchs_weights, filename = here("figures/appendix_bw_crossover_1890_1905_nchs_weights.png"), width = 7.5, height = 5, bg = "white")
+
+# Save plots
+ggsave(plot = pooled_bwcrossover_census_weights, filename = here("figures/appendix_bw_crossover_1890_1905_census_weights.png"), width = 7.5, height = 5, bg = "white")
+```
+

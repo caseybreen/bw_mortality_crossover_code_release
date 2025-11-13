@@ -1,0 +1,227 @@
+---
+title: "Sample Representativeness"
+author: Casey Breen
+---
+
+Summary: Assess sample representativeness and also try reweighting... 
+
+```{r}
+## library packages
+library(here)
+source(here("code", "helpers.R"))
+
+### read in dmf 
+dmf <- fread(here("data", "censoc_dmf_clean.csv"))
+
+## read in 1940 census 
+census_1940 <- fread("~/workspace/data/P.tsv", select = c("HISTID", "SERIALP", "AGE", "INCWAGE", "SEX", "EDUC", "RACE", "RELATE", "MARST", "SEI")) %>% 
+  janitor::clean_names()
+
+## read in 1940 census household
+census_1940_h <- fread("~/workspace/data/H.tsv", select = c("SERIAL", "STATEFIP", "OWNERSHP", "URBAN", "REGION")) %>% 
+  janitor::clean_names()
+```
+
+## Link data 
+
+```{r}
+## combine census person and household vars 
+census_1940_hh_vars <- census_1940 %>% 
+  inner_join(census_1940_h, by = c("serialp" = "serial"))
+
+census_1940_hh_vars <- census_1940_hh_vars %>% 
+  filter(sex == 1)
+
+## add on dmf  
+census_1940_hh_vars <- census_1940_hh_vars %>% 
+  left_join(dmf %>% filter(byear %in% 1890:1905), by = "histid")
+
+## recode education variable to years of education
+census_1940_hh_vars <- census_1940_hh_vars %>% 
+  recode_education(educ_var = "educ")
+```
+
+## Recode variables 
+
+```{r}
+## recode variables 
+census_1940_hh_vars <- census_1940_hh_vars %>% 
+  mutate(race = race.x) %>% 
+  filter(age %in% c(32:50)) %>% 
+  mutate(match_conservative = case_when(
+    link_abe_exact_conservative == 1 ~ "Matched",
+    TRUE ~ "Unmatched"
+  ),
+  match_standard = case_when(
+    link_abe_exact_conservative %in% c(0, 1) ~ "Matched",
+    TRUE ~ "Unmatched"
+  ), 
+  hs = case_when(
+    educ >= 60 & educ < 998 ~ 1,
+    TRUE ~ 0
+  ), 
+  rural = case_when(
+    urban == 1 ~ 1,
+    TRUE ~ 0
+  ),
+  black = case_when( 
+    race == 200 ~ 1,
+    TRUE ~ 0
+  ), 
+  white = case_when(
+    race == 100 ~ 1,
+    TRUE ~ 0
+  ),
+  homeown = case_when(
+    ownershp == 10 ~ 1, 
+    TRUE ~ 0
+  ),
+  p_hh_head = case_when(
+    relate == 101 ~ 1, 
+    TRUE ~ 0
+  ),
+  Education = case_when(
+    educ <= 50 ~ "No high school",
+    educ %in% 60:90 ~ "High school or some college",
+    educ %in% 100:116 ~ "Bachelors degree or more",
+  ), 
+  SES = case_when(
+    sei %in% 1:12 ~ "Low SES",
+    sei %in% 12:25 ~ "Medium SES",
+    sei >= 26 ~      "High SES"
+  ),
+  Marriage = case_when(
+      marst %in% 1:2 ~ "Ever married",
+      TRUE ~ "Never married" ),
+  Race = case_when(
+    race == 100 ~ "White",
+    race == 200 ~ "Black",
+    TRUE ~ "Other"
+  )) %>% 
+  mutate(Rural = case_when(
+    rural == 1 ~ "Rural",
+    TRUE ~ "Urban"
+  ),
+  Home = case_when(
+    homeown == 1 ~ "Homeowner",
+    TRUE ~ "Renter"
+  ),
+  Region = as_factor(region)) %>% 
+   mutate(link_abe_exact_standard = case_when(
+    link_abe_exact_conservative %in% c(0, 1) ~ 1,
+    TRUE ~ 0
+  ))
+
+```
+
+
+
+```{r}
+## tabulations for men in 1940 census 
+census_characteristics <- census_1940_hh_vars %>%     
+ select(histid, Education, SES, Marriage, Region, Rural, Home, Race) %>%
+  pivot_longer(-c(histid, Race)) %>% 
+  group_by(name, value, Race) %>%
+  tally() %>%    
+  group_by(Race, name) %>% 
+  mutate(prop = round(100*prop.table(n), 1)) %>% 
+  rename(n_gen = n, prop_gen = prop)
+
+## tabulations for men in CenSoc-DMF conservative 
+dmf_characteristics_conservative <- census_1940_hh_vars %>% 
+  filter(link_abe_exact_conservative == 1) %>% 
+  select(histid, Education, SES, Marriage, Region, Rural, Home, Race) %>%
+  pivot_longer(-c(histid, Race)) %>% 
+  group_by(name, value, Race) %>%
+  tally() %>%    
+  group_by(Race, name) %>% 
+  mutate(prop = round(100*prop.table(n), 1)) %>% 
+  rename(n_gen_conservative = n, prop_conservative = prop)
+```
+
+
+```{r}
+combined_characteristics <- census_characteristics %>% 
+  inner_join(dmf_characteristics_conservative, by = c("name", "value", "Race")) %>% 
+  mutate(name = as.factor(name), value = as.factor(value)) %>% 
+  mutate(name = factor(name, levels = c("Education", "Marriage", "Home", "SES", "Rural", "Region"))) %>% 
+  arrange(name, value) %>% 
+   filter(name != "Region") %>% 
+  filter(!is.na(value)) %>% 
+  mutate(value = factor(value, levels = c("No high school",
+                                          "High school or some college",
+                                          "Bachelors degree or more",
+                                          "Homeowner",
+                                          "Renter",
+                                          "Other",
+                                          "Ever married",
+                                          "Never married",
+                                          "Low SES",
+                                          "Medium SES",
+                                           "High SES",
+                                           "Rural",
+                                           "Urban")))
+```
+
+```{r}
+rep_plot <- combined_characteristics %>% 
+  filter(Race != "Other") %>% 
+           ggplot() +
+   geom_segment(aes(xend=prop_conservative, x=prop_gen, y=value, yend=value),
+        #       arrow = ggplot2::arrow(length = unit(0.1, "cm")),
+               color='black', 
+               alpha=0.5) +
+  geom_point(size = 1.5, aes(x = prop_gen, y=value, color='1940 Census')) +
+  geom_point(size = 1.5, aes(x = prop_conservative, y=value, color='Censoc-DMF')) +
+  facet_grid(name ~ Race, scales='free_y', space='free_y', switch='y') +
+  labs(x = "Fraction of sample") +
+  scale_color_manual(name = "", values = c("1940 Census" = "black", 'Censoc-DMF' = "red")) + 
+  scale_x_continuous(labels = scales::percent_format(scale = 1)) + 
+  theme_bw() +
+  theme(legend.position=c(.915, .945),
+        legend.direction='vertical',
+        legend.margin=margin(t=0, unit='cm'),
+        legend.box.background = element_rect(colour = "black"),
+        legend.title=element_blank()) 
+
+ggsave(rep_plot, filename = here("figures/appendix_representativeness_plot.png"), height = 6, width = 9)
+```
+
+
+```{r}
+## tabulations for men in 1940 census 
+census_characteristics <- census_1940_hh_vars %>%     
+ select(histid, Education, SES, Marriage, Region, Rural, Home, Race) %>%
+  pivot_longer(-c(histid, Race)) %>% 
+  group_by(name, value, Race) %>%
+  tally() %>%    
+  group_by(Race, name) %>% 
+  mutate(proportion = prop.table(n))
+
+## get around 
+marginals_round <- census_characteristics %>% 
+  mutate(variable = name, level = value) %>% 
+  # mutate(proportion = case_when(
+  #   variable != "region_string" ~ round(prop_gen/100, 3),
+  #   TRUE ~ round(prop_gen/100, 4))) %>% 
+  filter(variable %in% c("Education", "Home", "Marriage", "Region", "Rural", "SES"))
+
+## create weights 
+dmf_sibs_black <- autumn::harvest(data = census_1940_hh_vars %>% filter(!is.na(byear)) %>% filter(Race == "Black"), target = marginals_round %>% filter(Race == "Black")) 
+
+## create weights 
+dmf_sibs_white <- autumn::harvest(data = census_1940_hh_vars %>% filter(!is.na(byear)) %>% filter(Race == "White"), target = marginals_round %>% filter(Race == "White")) 
+
+## dmf weights 
+dmf_clean_weights <- dmf_sibs_black %>% 
+  bind_rows(dmf_sibs_white) %>% 
+  mutate(weight_1940_census = weights) %>% 
+    select(histid, weight, weight_conservative, byear, dyear, death_age, race = race.y, link_abe_exact_conservative, byeardiff_census_minus_dmf, bpl, census_age, weight_nchs, weight_1940_census)
+
+
+fwrite(dmf_clean_weights, here("data", "censoc_dmf_clean.csv"))
+```
+
+
+
+

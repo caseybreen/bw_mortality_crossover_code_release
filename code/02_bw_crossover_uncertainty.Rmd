@@ -17,56 +17,60 @@ dmf <- fread(here("data", "censoc_dmf_clean.csv"))
 dmf_filter <- dmf %>% 
   filter(byear %in% c(1890:1905)) 
 
-bootstrap_n = 1000
+bootstrap_n = 100
 ```
 
 ## BW-Crossover
 
 ```{r}
-ln_qx_point_estimate <- dmf_filter %>% 
-  calculate_ln_qx() %>% 
+qx_point_estimate <- dmf_filter %>% 
+  calculate_qx() %>% 
   group_by(death_age, race) %>%
-  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE))
+  summarize(qx = mean(qx, na.rm = TRUE))
 
 # Bootstrap and average hazards across byear within each bootstrap
 boot_df_1 <- replicate(bootstrap_n, {
   dmf_filter %>%
     sample_frac(replace = TRUE) %>%
-    calculate_ln_qx() %>%
+    calculate_qx() %>%
     group_by(death_age, race) %>%
-    summarize(ln_qx = mean(ln_qx, na.rm = TRUE), .groups = "drop")
+    summarize(qx = mean(qx, na.rm = TRUE),
+              .groups = "drop")
 }, simplify = FALSE) %>%
   bind_rows(.id = "bootstrap_id")
 
 # Summarize hazards across bootstraps
-ln_qx_uncertainty <- boot_df_1 %>%
+qx_uncertainty <- boot_df_1 %>%
   group_by(death_age, race) %>%
   summarize(
-    mean_hazard = mean(ln_qx, na.rm = TRUE),
-    lower_ci = quantile(ln_qx, 0.025, na.rm = TRUE),
-    upper_ci = quantile(ln_qx, 0.975, na.rm = TRUE),
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
     .groups = "drop"
   ) 
 
-ln_qx_uncertainty_point_estimate <- ln_qx_uncertainty %>% 
-  left_join(ln_qx_point_estimate, by = c("death_age", "race"))
+qx_uncertainty_point_estimate <- qx_uncertainty %>% 
+  left_join(qx_point_estimate, by = c("death_age", "race"))
 
 # Plot
-pooled_bwcrossover <- ln_qx_uncertainty_point_estimate %>%
+pooled_bwcrossover <- qx_uncertainty_point_estimate %>%
   filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
-  ggplot(aes(x = death_age, y = ln_qx_point_estimate, color = race)) +
+  ggplot(aes(x = death_age, y = qx, color = race)) +
   geom_line() +
   geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
   geom_vline(xintercept = 81.5, linetype = "dashed", color = "grey") +
   geom_vline(xintercept = 86.5, linetype = "dashed", color = "grey") +
   theme_cowplot() +
   ggsci::scale_colour_lancet() +
+  scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01)
+  ) + 
   scale_shape_manual(values = c(21, 24)) +
   labs(
     x = "Age",
-    y = expression(atop("Logged Age-Specific Probability of Dying", ln(q[x]))),
-    title = "Mortality Crossovers",
-    subtitle = "Pooled cohorts of 1890-1905"
+    y = expression("Probability of Dying " (q[x]))
   ) +
   theme(
     legend.position = c(0.999, 0.001),
@@ -76,26 +80,28 @@ pooled_bwcrossover <- ln_qx_uncertainty_point_estimate %>%
     legend.background = element_rect(color = "black", linewidth = 0.5, linetype = "solid"),
     legend.title = element_blank()
   ) + 
-    annotate("text", x = 84, y = -1.9,
+    annotate("text", x = 84, y = exp(-1.9),
            label = "Approximately \n equal",
            angle = 25, size = 4, color = "darkgrey") +
-  annotate("text", x = 78, y = -2.3,
+  annotate("text", x = 78, y = exp(-2.3),
            label = "Black mortality higher",
            angle = 25, size = 4, color = "darkgrey") +
-    annotate("text", x = 74.8, y = -2.53,
+    annotate("text", x = 74.8, y = exp(-2.53),
            label = "←",
            angle = 25, size = 7, color = "darkgrey") +
-  annotate("text", x = 90, y = -1.4,
+  annotate("text", x = 90, y = exp(-1.4),
            label = "White mortality higher",
            angle = 25, size = 4, color = "darkgrey") +
-  annotate("text", x = 93.2, y = -1.17,
+  annotate("text", x = 93.2, y = exp(-1.17),
            label = "→",
            angle = 25, size = 7, color = "darkgrey") +
   coord_cartesian(clip = "off")
 
+
 # Save plots
-ggsave(plot = pooled_bwcrossover, filename = here("figures", "fig1_bw_crossover_1890_1905.png"), width = 8, height = 5, bg = "white")
+ggsave(plot = pooled_bwcrossover, filename = here("figures", "fig1_bw_crossover_1890_1905.png"), width = 8.3, height = 4.5, bg = "white")
 ```
+
 
 ## BW-Crossover, dropping heaped years 
 
@@ -104,19 +110,18 @@ ggsave(plot = pooled_bwcrossover, filename = here("figures", "fig1_bw_crossover_
 dmf_filter_nonheaped <- dmf %>%
   filter(byear %in% c(1891:1894, 1896:1899, 1901:1904))
 
-
 ln_qx_point_estimate <- dmf_filter_nonheaped %>% 
-  calculate_ln_qx() %>% 
+  calculate_qx() %>% 
   group_by(death_age, race) %>%
-  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE))
+  summarize(qx = mean(qx, na.rm = TRUE))
 
 # Bootstrap and average hazards across byear within each bootstrap
 boot_df_nonheaped <- replicate(bootstrap_n, {
   dmf_filter_nonheaped %>%
     sample_frac(replace = TRUE) %>%
-    calculate_ln_qx() %>%
+    calculate_qx() %>%
     group_by(death_age, race) %>%
-    summarize(ln_qx = mean(ln_qx, na.rm = TRUE), .groups = "drop")
+    summarize(qx = mean(qx, na.rm = TRUE), .groups = "drop")
 }, simplify = FALSE) %>%
   bind_rows(.id = "bootstrap_id")
 
@@ -124,9 +129,9 @@ boot_df_nonheaped <- replicate(bootstrap_n, {
 ln_qx_uncertainty <- boot_df_nonheaped %>%
   group_by(death_age, race) %>%
   summarize(
-    mean_hazard = mean(ln_qx, na.rm = TRUE),
-    lower_ci = quantile(ln_qx, 0.025, na.rm = TRUE),
-    upper_ci = quantile(ln_qx, 0.975, na.rm = TRUE),
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
     .groups = "drop"
   )
 
@@ -136,7 +141,7 @@ ln_qx_uncertainty_point_estimate <- ln_qx_uncertainty %>%
 # Plot
 pooled_bwcrossover_nonheaped <- ln_qx_uncertainty_point_estimate %>%
   filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
-  ggplot(aes(x = death_age, y = ln_qx_point_estimate, color = race)) +
+  ggplot(aes(x = death_age, y = qx, color = race)) +
   geom_line() +
   geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
   geom_vline(xintercept = 86, linetype = "dashed") +
@@ -145,10 +150,15 @@ pooled_bwcrossover_nonheaped <- ln_qx_uncertainty_point_estimate %>%
   scale_shape_manual(values = c(21, 24)) +
   labs(
     x = "Age",
-    y = "Logged Age-Specific Probability of Dying \n ln(qx)",
-    title = "Non-heaped Birth Years Restriction",
-    subtitle = "Pooled cohorts of 1891-1894, 1896-1899, 1901-1904"
+    y = expression("Probability of Dying " (q[x])),
+    title = "Non-heaped Birth Years Restriction"
+   # subtitle = "Pooled cohorts of 1891-1894, 1896-1899, 1901-1904"
   ) +
+  scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01)
+  ) + 
   theme(
     legend.position = c(0.999, 0.001),
     legend.justification = c("right", "bottom"),
@@ -158,7 +168,23 @@ pooled_bwcrossover_nonheaped <- ln_qx_uncertainty_point_estimate %>%
     legend.title = element_blank()
   )
 
-# ggsave(plot = pooled_bwcrossover_nonheaped, filename = here("figures", "bw_crossover_1890_1905_noheap.png"), width = 8, height = 5, bg = "white")
+mort_ratio_heaped_years <- qx_point_estimate %>%
+  select(race, death_age, qx) %>%
+  pivot_wider(names_from = race, values_from = qx) %>%
+  mutate(bw_ratio = `Black Americans` / `White Americans`) %>% 
+  filter(death_age %in% c(75:100))
+
+ratio_plot_nonheaped <- ggplot(mort_ratio_heaped_years, aes(x = death_age, y = bw_ratio)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_smooth(method = "lm", se = F) + 
+  labs(
+    x = "Age",
+    y = "Death Probability Ratio \n (Black / White)",
+    title = ""
+    ) +
+  ylim(0.8, 1.13)+ 
+  cowplot::theme_cowplot()
 ```
 
 
@@ -168,43 +194,41 @@ pooled_bwcrossover_nonheaped <- ln_qx_uncertainty_point_estimate %>%
 dmf_exact_match <- dmf %>% 
   filter(byear %in% c(1890:1905)) %>% 
   filter(byeardiff_census_minus_dmf == 0)
-```
 
-
-```{r}
 ## calculate point estimates for ln qx 
-ln_qx_point_estimate <- dmf_exact_match %>% 
-  calculate_ln_qx() %>% 
+qx_point_estimate <- dmf_exact_match %>% 
+  calculate_qx() %>% 
   group_by(death_age, race) %>%
-  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE))
+  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE),
+            qx = mean(qx, na.rm = TRUE))
 
 # Bootstrap and average hazards across byear within each bootstrap
 boot_df_1 <- replicate(bootstrap_n, {
   dmf_exact_match %>%
     sample_frac(replace = TRUE) %>%
-    calculate_ln_qx() %>%
+    calculate_qx() %>%
     group_by(death_age, race) %>%
-    summarize(ln_qx = mean(ln_qx, na.rm = TRUE), .groups = "drop")
+    summarize(qx = mean(qx, na.rm = TRUE), .groups = "drop")
 }, simplify = FALSE) %>%
   bind_rows(.id = "bootstrap_id")
 
 # Summarize hazards across bootstraps
-ln_qx_uncertainty <- boot_df_1 %>%
+qx_uncertainty <- boot_df_1 %>%
   group_by(death_age, race) %>%
   summarize(
-    mean_hazard = mean(ln_qx, na.rm = TRUE),
-    lower_ci = quantile(ln_qx, 0.025, na.rm = TRUE),
-    upper_ci = quantile(ln_qx, 0.975, na.rm = TRUE),
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
     .groups = "drop"
   )
 
-ln_qx_uncertainty_point_estimate <- ln_qx_uncertainty %>% 
-  left_join(ln_qx_point_estimate, by = c("death_age", "race"))
+qx_uncertainty_point_estimate <- qx_uncertainty %>% 
+  left_join(qx_point_estimate, by = c("death_age", "race"))
 
 # Plot
-pooled_bwcrossover_exact <- ln_qx_uncertainty_point_estimate %>%
+pooled_bwcrossover_exact <- qx_uncertainty_point_estimate %>%
   filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
-  ggplot(aes(x = death_age, y = ln_qx_point_estimate, color = race)) +
+  ggplot(aes(x = death_age, y = qx, color = race)) +
   geom_line() +
   geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
   geom_vline(xintercept = 86, linetype = "dashed") +
@@ -213,9 +237,12 @@ pooled_bwcrossover_exact <- ln_qx_uncertainty_point_estimate %>%
   scale_shape_manual(values = c(21, 24)) +
   labs(
     x = "Age",
-    y = "Logged Age-Specific Probability of Dying \n ln(qx)",
-    title = "Exact Age Match Restriction",
-    subtitle = "Pooled cohorts of 1890-1905"
+    y = expression("Probability of Dying " (q[x])),
+    title = "Exact Age Match Restriction") +
+  scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01)
   ) +
   theme(
     legend.position = c(0.999, 0.001),
@@ -226,14 +253,273 @@ pooled_bwcrossover_exact <- ln_qx_uncertainty_point_estimate %>%
     legend.title = element_blank()
   )
 
-# Save plot
-# ggsave(plot = pooled_bwcrossover_exact, filename = here("figures", "bw_crossover_1890_1905_exact_age.png"), width = 7.5, height = 5, bg = "white")
+mort_ratio_exact_match <- qx_point_estimate %>%
+  select(race, death_age, qx) %>%
+  pivot_wider(names_from = race, values_from = qx) %>%
+  mutate(bw_ratio = `Black Americans` / `White Americans`) %>% 
+  filter(death_age %in% c(75:100))
+
+ratio_plot_exact_match <- ggplot(mort_ratio_exact_match, aes(x = death_age, y = bw_ratio)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_smooth(method = "lm", se = F) + 
+  labs(
+    x = "Age",
+    y = "Death Probability Ratio \n (Black / White)",
+    title = ""
+    ) +
+    ylim(0.8, 1.13)+ 
+  cowplot::theme_cowplot()
+```
+
+
+
+```{r}
+dmf_filter <- dmf_filter %>% 
+  group_by(race) %>% 
+  mutate(weight_nchs = case_when(is.na(weight_nchs) ~ mean(weight_nchs, na.rm = T), TRUE ~ weight_nchs))
+
+qx_point_estimate_weighted <- dmf_filter %>% 
+  calculate_qx(weight_var = "weight_nchs") %>% 
+  group_by(death_age, race) %>%
+  summarize(qx = mean(qx, na.rm = TRUE))
+
+# Bootstrap and average hazards across byear within each bootstrap
+boot_df_1 <- replicate(bootstrap_n, {
+  dmf_filter %>%
+    sample_frac(replace = TRUE) %>%
+    calculate_qx(weight_var = "weight_nchs") %>% 
+    group_by(death_age, race) %>%
+    summarize(qx = mean(qx, na.rm = TRUE), .groups = "drop")
+}, simplify = FALSE) %>%
+  bind_rows(.id = "bootstrap_id")
+
+# Summarize hazards across bootstraps
+qx_uncertainty <- boot_df_1 %>%
+  group_by(death_age, race) %>%
+  summarize(
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  ) 
+
+qx_uncertainty_point_estimate <- qx_uncertainty %>% 
+  left_join(qx_point_estimate_weighted, by = c("death_age", "race"))
+
+# Plot
+pooled_bwcrossover_nchs_weights <- qx_uncertainty_point_estimate %>%
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  ggplot(aes(x = death_age, y = qx, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  geom_vline(xintercept = 86, linetype = "dashed") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    x = "Age",
+    y = expression("Probability of Dying " (q[x])),
+    title = "NCHS-Based Weights") +
+  scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01)
+  ) + 
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", size = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  )
+
+mort_ratio_nchs <-qx_point_estimate_weighted %>%
+  select(race, death_age, qx) %>%
+  pivot_wider(names_from = race, values_from = qx) %>%
+  mutate(bw_ratio = `Black Americans` / `White Americans`) %>% 
+  filter(death_age %in% c(75:100))
+
+ratio_plot_nchs_weights <- ggplot(mort_ratio_nchs, aes(x = death_age, y = bw_ratio)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_smooth(method = "lm", se = F) + 
+  labs(
+    x = "Age",
+    y = "Death Probability Ratio \n (Black / White)",
+    title = ""
+    ) +
+    ylim(0.8, 1.13)+ 
+  cowplot::theme_cowplot()
+```
+
+
+## 1940 Census weights 
+
+```{r}
+qx_point_estimate_weighted <- dmf_filter %>% 
+  calculate_qx(weight_var = "weight_1940_census") %>% 
+  group_by(death_age, race) %>%
+  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE),
+            qx_point_estimate = mean(qx, na.rm = TRUE))
+
+# Bootstrap and average hazards across byear within each bootstrap
+boot_df_1 <- replicate(bootstrap_n, {
+  dmf_filter %>%
+    sample_frac(replace = TRUE) %>%
+    calculate_qx(weight_var = "weight_1940_census") %>%
+    group_by(death_age, race) %>%
+    summarize(qx = mean(qx, na.rm = TRUE), .groups = "drop")
+}, simplify = FALSE) %>%
+  bind_rows(.id = "bootstrap_id")
+
+# Summarize hazards across bootstraps
+qx_uncertainty <- boot_df_1 %>%
+  group_by(death_age, race) %>%
+  summarize(
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  ) 
+
+qx_uncertainty_point_estimate <- qx_uncertainty %>% 
+  left_join(qx_point_estimate_weighted, by = c("death_age", "race"))
+
+# Plot
+pooled_bwcrossover_census_weights <- qx_uncertainty_point_estimate %>%
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  ggplot(aes(x = death_age, y = qx_point_estimate, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  geom_vline(xintercept = 86, linetype = "dashed") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    x = "Age",
+    y = expression("Probability of Dying " (q[x])),
+    title = "1940-Census-Based Weights"
+    ) +
+  scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01)
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", size = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  )
+
+mort_ratio <- qx_point_estimate_weighted %>%
+  select(race, death_age, qx_point_estimate) %>%
+  pivot_wider(names_from = race, values_from = qx_point_estimate) %>%
+  mutate(bw_ratio = `Black Americans` / `White Americans`) %>% 
+  filter(death_age %in% c(75:100))
+
+ratio_plot_census_weights <- ggplot(mort_ratio, aes(x = death_age, y = bw_ratio)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_smooth(method = "lm", se = F) + 
+  labs(
+    x = "Age",
+    y = "Death Probability Ratio \n (Black / White)",
+    title = ""
+    ) +
+    ylim(0.8, 1.13)+ 
+  cowplot::theme_cowplot()
 ```
 
 ```{r}
-crossover_extra_checks <- cowplot::plot_grid(pooled_bwcrossover_exact, pooled_bwcrossover_nonheaped, labels = "AUTO")
+crossover_extra_checks <- cowplot::plot_grid(pooled_bwcrossover_nonheaped, pooled_bwcrossover_exact, labels = "AUTO")
 
 ggsave(plot = crossover_extra_checks, filename = here("figures", "fig2_bw_crossover_1890_1905_robustness.png"), width = 12, height = 5, bg = "white")
+```
 
+
+```{r}
+fig2_robustness <- cowplot::plot_grid(pooled_bwcrossover_nonheaped, ratio_plot_nonheaped, pooled_bwcrossover_exact, ratio_plot_exact_match,pooled_bwcrossover_nchs_weights,  ratio_plot_nchs_weights, pooled_bwcrossover_census_weights, ratio_plot_census_weights, ncol = 2, labels = "AUTO")
+
+ggsave(plot = fig2_robustness, filename = here("figures", "fig2_bw_crossover_1890_1905_robustness.png"), width = 12, height = 14, bg = "white")
+```
+
+## Crossover by birth cohort 
+
+```{r}
+ln_qx_point_estimate <- dmf_filter %>% 
+  group_by(byear) %>% 
+  calculate_qx() %>% 
+  group_by(byear, death_age, race) %>%
+  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE),
+            qx_point_estimate = mean(qx, na.rm = TRUE))
+
+
+df <- ln_qx_point_estimate %>%
+  filter(byear %in% 1890:1905) %>% 
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans"))
+
+# Assuming your data frame is called df
+df_wide <- df %>%
+  select(byear, qx_point_estimate, race, death_age) %>% 
+  pivot_wider(
+    names_from = race,
+    values_from = qx_point_estimate
+  ) %>%
+  mutate(diff_bw = `Black Americans` / `White Americans` )
+
+# Plot difference in logged mortality (Black - White)
+crossover_by_cohort <- ggplot(df_wide, aes(x = death_age, y = diff_bw, group = byear)) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "gray50") +
+  geom_point(size = 2, alpha = 0.6) +
+  labs(
+    x = "Age at Death",
+    y = "Probability of Dying, Ratio \n (Black / White)",
+    color = "Birth Year"
+  ) +  geom_smooth( method = "lm") + 
+  facet_wrap(~byear) + 
+  theme_cowplot() + 
+  theme(
+    strip.background = element_rect(fill = "white", color = "black", linewidth = 0.8),
+    strip.text = element_text(size = 11, face = "bold", color = "black"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.background = element_rect(fill = "#f9f9f9", color = NA),
+    panel.grid = element_line(color = "grey95"),
+    panel.spacing = unit(1.5, "lines"),
+    aspect.ratio = .9,
+    legend.position = "bottom",
+    legend.justification = "center",  # centers the whole legend box
+    legend.title = element_text(size = 13, hjust = 0.5, vjust = 1, margin = margin(b = 4)),
+    legend.text = element_text(size = 11)
+  ) 
+
+ggsave(plot = crossover_by_cohort, filename = here("figures", "appendix_bw_crossover_1890_1905_by_cohort.png"), width = 10, height = 10, bg = "white")
+```
+
+## summary stats 
+
+Calculate summary stats for the abstract 
+
+```{r}
+ln_qx_point_estimate <- dmf_filter %>% 
+  calculate_qx() %>% 
+  group_by(death_age, race) %>%
+  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE),
+            qx = mean(qx, na.rm = TRUE))
+
+df_summary <- ln_qx_point_estimate %>%
+  filter(death_age %in% c(75, 95)) %>%
+  select(death_age, race, qx) %>%
+  pivot_wider(names_from = race, values_from = qx) %>%
+  mutate(
+    diff_bw = `Black Americans` - `White Americans`,
+    pct_diff = 100 * diff_bw / `White Americans`
+  )
+
+df_summary
 ```
 

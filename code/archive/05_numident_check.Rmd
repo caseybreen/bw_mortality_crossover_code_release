@@ -44,3 +44,91 @@ dmf_clean_joined %>%
   count(diff_deathage)
 ```
 
+
+
+```{r}
+calculate_ln_qx <- function(data) {
+  data %>%
+    group_by(byear, death_age, race) %>%
+    summarize(deaths = sum(ccweight), .groups = "drop") %>%
+    arrange(race, byear, death_age) %>%  ## data organized for cumsum which comes later
+    group_by(race, byear) %>%
+    mutate(
+      lx = sum(deaths) - lag(cumsum(deaths), default = 0),
+      qx = deaths / lx,
+      ln_qx = log(qx) ## this will give infinity unless there is at least one death per cell (!)
+    ) %>%
+    ungroup()
+}
+```
+
+
+```{r}
+bunmd_subsample <- bunmd %>% 
+  filter(!is.na(ccweight)) %>% 
+  filter(byear %in% 1905:1907) %>% 
+  filter(sex == 2) %>% 
+  filter(race_first == 1 | race_first == 2) %>% 
+  mutate(race = case_when(
+    race_first == 1 ~ "White Americans",
+    race_first == 2 ~ "Black Americans"
+  ))
+  
+ln_qx_point_estimate <- bunmd_subsample %>% 
+  filter(dyear %in% c(1988:2005)) %>% 
+  calculate_ln_qx() %>% 
+  group_by(death_age, race) %>%
+  summarize(ln_qx_point_estimate = mean(ln_qx, na.rm = TRUE),
+            qx = mean(qx, na.rm = TRUE))
+  
+ln_qx_point_estimate 
+
+
+ln_qx_point_estimate %>%
+  filter(death_age %in% 78:95, race %in% c("White Americans", "Black Americans")) %>%
+  ggplot(aes(x = death_age, y = ln_qx_point_estimate, color = race)) +
+  geom_line() +
+  geom_point(size = 0.75, fill = "white") +
+  geom_vline(xintercept = 81.5, linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = 86.5, linetype = "dashed", color = "grey") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    x = "Age",
+    y = expression(atop("Logged Age-Specific Probability of Dying", ln(q[x]))),
+    title = "Mortality Crossovers",
+    subtitle = "Pooled cohorts of 1890-1905"
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", linewidth = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  ) + 
+    annotate("text", x = 84, y = -1.9,
+           label = "Approximately \n equal",
+           angle = 25, size = 4, color = "darkgrey") +
+  annotate("text", x = 78, y = -2.3,
+           label = "Black mortality higher",
+           angle = 25, size = 4, color = "darkgrey") +
+    annotate("text", x = 74.8, y = -2.53,
+           label = "←",
+           angle = 25, size = 7, color = "darkgrey") +
+  annotate("text", x = 90, y = -1.4,
+           label = "White mortality higher",
+           angle = 25, size = 4, color = "darkgrey") +
+  annotate("text", x = 93.2, y = -1.17,
+           label = "→",
+           angle = 25, size = 7, color = "darkgrey") +
+  coord_cartesian(clip = "off")
+
+```
+
+
+
+
+
+
