@@ -3,7 +3,7 @@ title: "Calculate Gompertz Models"
 author: Casey Breen
 ---
 
-Summary: calculate the Gompertz models 
+Summary: Re-calculate the BW-crossover using Gompertz models
 
 
 ```{r}
@@ -19,10 +19,9 @@ dmf_restrict <- dmf %>%
 ```
 
 
-
 ```{r}
-dmf_black <- dmf_restrict %>% filter(race == "Black Americans")
-dmf_white <- dmf_restrict %>% filter(race == "White Americans")
+dmf_black <- dmf_restrict %>% filter(race == "Black Men")
+dmf_white <- dmf_restrict %>% filter(race == "White Men")
 ```
 
 
@@ -67,15 +66,16 @@ mortality_crossover_1890_1905 <- tibble(year = 0:121, `White Americans` = hx_whi
 # ggsave(plot = mortality_crossover_1890_1905, filename = here("figures", "bw_crossover_gompertz_1890_1905.png"), width = 7, height = 5, bg = "white")
 ```
 
-## cohorts of 1906-1915
+
+## Cohorts of 1906-1915
 
 ```{r}
 ## restrict to byears 
 dmf_restrict <- dmf %>% 
   filter(byear %in% 1906:1915)
 
-dmf_black <- dmf_restrict %>% filter(race == "Black Americans")
-dmf_white <- dmf_restrict %>% filter(race == "White Americans")
+dmf_black <- dmf_restrict %>% filter(race == "Black Men")
+dmf_white <- dmf_restrict %>% filter(race == "White Men")
 ```
 
 

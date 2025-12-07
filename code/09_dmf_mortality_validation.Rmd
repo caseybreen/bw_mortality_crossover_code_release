@@ -1,0 +1,108 @@
+---
+title: "Mortality Validation Code"
+author: Casey Breen
+---
+
+Summary: This script generates a figure which compares the age-specific mortality rates for CenSoc-DMF and CenSoc-Numident to the "gold-standard" Human Mortality Database (HMD). 
+
+
+```{r}
+## Library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## Read in dmf 
+dmf <- fread(here("data", "censoc_dmf_clean.csv"))
+
+## Restrict to ages 
+dmf_filter <- dmf %>% 
+  filter(byear %in% c(1890:1905)) 
+
+hmd_mr <- fread(here("data/USA.cMx_1x1.txt"))
+hmd_exposure <- fread(here("data/USA.cExposures_1x1.txt"))
+```
+
+
+## Calculate hmd mortality rates 
+
+```{r}
+## hmd mortality rates  
+hmd_cohort <- hmd_mr %>% 
+  filter(Age %in% 50:100) %>% 
+  mutate(age = as.numeric(Age),
+         female = as.numeric(Female),
+         male = as.numeric(Male),
+         total = as.numeric(Total)) %>% 
+  mutate(source = "HMD (Human Mortality Database)") %>% 
+  mutate(death_age = age, byear = Year) 
+```
+
+
+## calculate adjustment factors for censoc deaths past highest observed age
+
+```{r}
+## calculate adjustment factor for deaths occuring after age 94 (dmf)
+l_65 <- as.numeric(hmd_exposure[Year == 1900][Age == 75]$Male)
+l_95 <- as.numeric(hmd_exposure[Year == 1900][Age == 105]$Male)
+dmf_adjustment <- (l_65 + l_95)/l_65
+```
+
+
+## calculate dmf mortality rates 
+
+```{r}
+## dmf filter
+dmf_mr_adjusted_test <- dmf %>% 
+  filter(byear %in% c(1890:1905)) %>% 
+  group_by(byear) %>% 
+  filter(death_age != min(death_age) & death_age != max(death_age)) %>% 
+  ungroup() %>% 
+  calculate_qx_pooled(weight_var = "weight_nchs") %>% 
+  select(byear, death_age, male = qx) %>% 
+  mutate(source = "CenSoc-DMF (Extinct Cohort Method)")
+
+## dmf mortality rate validation plot 
+dmf_mortality_validation <- hmd_cohort %>% 
+  mutate(death_age = age) %>% 
+  bind_rows(dmf_mr_adjusted_test) %>% 
+  filter(byear %in% c(1890:1905)) %>% 
+  ggplot(aes(x = death_age, y = male, color = source, linetype = source)) + 
+  geom_line(size = 1.5, alpha = 1) + 
+  scale_color_manual(values=c("blue", "black")) + 
+  scale_linetype_manual(values=c("dashed", "solid")) + 
+  cowplot::theme_cowplot() + 
+  xlim(75, 100) + 
+  scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01),
+    limits = c(0.05, 0.5)
+  ) + 
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    x = "Age",
+    y = expression("Probability of Dying " (q[x]))
+  ) +
+  guides(color = guide_legend(nrow = 3)) + 
+  facet_wrap(~byear) + 
+  theme(
+    strip.background = element_rect(fill = "white", color = "black", linewidth = 0.8),
+    strip.text = element_text(size = 11, face = "bold", color = "black"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.background = element_rect(fill = "#f9f9f9", color = NA),
+    panel.grid = element_line(color = "grey95"),
+    panel.spacing = unit(1.5, "lines"),
+    legend.position = "bottom",
+    legend.key.width=unit(3, "cm"),
+    legend.title=element_blank(),
+    legend.text = element_text(size = 11),
+    axis.title.x = element_text(face = "bold")
+  )
+```
+
+
+```{r}
+## save combined mortality estimation plot 
+ggsave(dmf_mortality_validation, filename = here("figures", "appendix_dmf_mortality_validation_weighted.png"), width = 10, height = 10, bg = "white")
+```
+

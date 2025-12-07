@@ -3,7 +3,10 @@ title: "Create Analysis file"
 author: Casey Breen
 ---
 
-Summary: Clean up data files 
+Summary: Clean up data files (CenSoc Numident and CenSoc-DMF).
+
+
+## Clean up CenSoc-DMF 
 
 ```{r}
 ## library packages 
@@ -19,8 +22,8 @@ dmf <- fread(here("data", "censoc_dmf_v2_1_linked_with_census.csv"))
 dmf <- dmf %>%
   janitor::clean_names() %>%
   mutate(race = case_when(
-    race == 100 ~ "White Americans",
-    race == 200 ~ "Black Americans"
+    race == 100 ~ "White Men",
+    race == 200 ~ "Black Men"
   )) %>%
   filter(link_abe_exact_conservative == 1) %>%
   filter(bpl < 15000) %>% 
@@ -39,5 +42,33 @@ dmf_clean <- dmf_clean %>%
   left_join(dmf_weights %>% select(histid = HISTID, weight_nchs = weight))
 
 fwrite(dmf_clean, here("data", "censoc_dmf_clean.csv"))
+```
+
+
+## Clean up CenSoc-Numident
+
+```{r}
+## read in DMF 
+numident <- fread(here("data", "censoc_numident_v3_linked.csv")) %>% 
+  janitor::clean_names()
+
+## recode race 
+## restrict to conservative matches 
+## restrict to people born in the US 
+numident <- numident %>%
+  janitor::clean_names() %>%
+  mutate(race = case_when(
+    raced == 100 ~ "White",
+    raced == 200 ~ "Black"
+  )) %>%
+  filter(bpld < 15000) %>% 
+  filter(!is.na(race))
+
+## DMF clean 
+numident_clean <- numident %>%
+  select(histid, sex, weight, byear, dyear, death_age, race, bpl, age)
+
+
+fwrite(numident_clean, here("data", "censoc_numident_clean.csv"))
 ```
 

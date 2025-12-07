@@ -53,24 +53,6 @@ hx_calc <- function(x, b, M) {
     return(hx)
   }
 
-
-## calculate ln_qx 
-## Function to calculate qx that can be bootstrapped 
-## All cells have at least one death for 1975-2005  
-# calculate_ln_qx <- function(data) {
-#   data %>%
-#     group_by(byear, death_age, race) %>%
-#     summarize(deaths = n(), .groups = "drop") %>%
-#     arrange(race, byear, death_age) %>%  ## data organized for cumsum which comes later
-#     group_by(race, byear) %>%
-#     mutate(
-#       lx = sum(deaths) - lag(cumsum(deaths), default = 0),
-#       qx = deaths / lx,
-#       ln_qx = log(qx) ## this will give infinity unless there is at least one death per cell (!)
-#     ) %>%
-#     ungroup()
-# }
-
 calculate_qx <- function(data, weight_var = NULL) {
   
   # If a weight variable is supplied, use weighted sum.
@@ -102,6 +84,36 @@ calculate_qx <- function(data, weight_var = NULL) {
     ungroup()
 }
 
+
+calculate_qx_pooled <- function(data, weight_var = NULL) {
+  
+  # Collapse over race; keep byear and death_age
+  if (!is.null(weight_var)) {
+    agg <- data %>%
+      dplyr::group_by(byear, death_age) %>%
+      dplyr::summarise(
+        deaths = sum(.data[[weight_var]], na.rm = TRUE),
+        .groups = "drop"
+      )
+  } else {
+    agg <- data %>%
+      dplyr::group_by(byear, death_age) %>%
+      dplyr::summarise(
+        deaths = dplyr::n(),
+        .groups = "drop"
+      )
+  }
+  
+  agg %>%
+    dplyr::arrange(byear, death_age) %>%
+    dplyr::group_by(byear) %>%
+    dplyr::mutate(
+      lx    = sum(deaths) - dplyr::lag(cumsum(deaths), default = 0),
+      qx    = deaths / lx,
+      ln_qx = log(qx)
+    ) %>%
+    dplyr::ungroup()
+}
 
 ## Source .Rmd 
 source_rmd = function(file, ...) {

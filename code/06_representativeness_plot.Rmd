@@ -107,7 +107,7 @@ census_1940_hh_vars <- census_1940_hh_vars %>%
     TRUE ~ "Renter"
   ),
   Region = as_factor(region)) %>% 
-   mutate(link_abe_exact_standard = case_when(
+  mutate(link_abe_exact_standard = case_when(
     link_abe_exact_conservative %in% c(0, 1) ~ 1,
     TRUE ~ 0
   ))
