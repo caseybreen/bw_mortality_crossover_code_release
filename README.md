@@ -44,8 +44,13 @@ Alternatively, researchers can run the following files individually in order:
   
 - `00_run_all.Rmd` – Master script to run the full analysis pipeline in sequence.
 - `01_create_analysis_file.Rmd` – Create cleaned analysis file.
-- `02_bw_crossover_uncertainty.Rmd` – Calculate age-specific mortality rates with uncertainty and visualize Black-White mortality crossovers.
-- `04_age_heaping.Rmd` – Assess an visualize age-heaping. 
+- `02_1940_census_weight_representativeness.Rmd` — Assess sample representativeness and construct raking weights. 
+- `03_bw_crossover_uncertainty.Rmd` – Calculate age-specific mortality rates with uncertainty and visualize Black-White mortality crossovers.
+- `04_gompertz_models_1890_1905.Rmd` – Test Gompertz parametric models for estimating the crossover from 1890 to 1905. 
+- `05_age_heaping.Rmd` – Assess and visualize age-heaping.
+- `06_bw_crossover_numident.Rmd` – Calculate age-specific mortality rates with uncertainty and visualize Black-White mortality crossovers in the Numident data. 
+- `07_dmf_mortality_validation.Rmd` – Run validation checks in the dmf. 
+
 
 ### Authors
 
