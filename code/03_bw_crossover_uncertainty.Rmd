@@ -11,13 +11,11 @@ library(here)
 source(here("code", "helpers.R"))
 
 ## Read in dmf 
-dmf <- fread(here("data", "censoc_dmf_clean.csv"))
+dmf <- fread(here("data", "censoc_dmf_clean_weighted.csv"))
 
 ## Restrict to ages 
 dmf_filter <- dmf %>% 
   filter(byear %in% c(1890:1905)) 
-
-bootstrap_n = 100
 ```
 
 ## BW-Crossover
@@ -49,11 +47,11 @@ qx_uncertainty <- boot_df_1 %>%
     .groups = "drop"
   ) 
 
-qx_uncertainty_point_estimate <- qx_uncertainty %>% 
+qx_uncertainty_point_estimate_dmf_men <- qx_uncertainty %>% 
   left_join(qx_point_estimate, by = c("death_age", "race"))
 
 # Plot
-pooled_bwcrossover <- qx_uncertainty_point_estimate %>%
+pooled_bwcrossover <- qx_uncertainty_point_estimate_dmf_men %>%
   filter(death_age %in% 75:100, race %in% c("White Men", "Black Men")) %>%
   ggplot(aes(x = death_age, y = qx, color = race)) +
   geom_line() +
@@ -151,7 +149,7 @@ pooled_bwcrossover_nonheaped <- ln_qx_uncertainty_point_estimate %>%
   labs(
     x = "Age",
     y = expression("Probability of Dying " (q[x])),
-    title = "Non-heaped Birth Years Restriction"
+    title = "Non-Heaped Birth Years Restriction"
    # subtitle = "Pooled cohorts of 1891-1894, 1896-1899, 1901-1904"
   ) +
   scale_y_continuous(

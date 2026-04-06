@@ -142,7 +142,8 @@ heaping_combined_plot <- cowplot::plot_grid(
   NULL,
   heaping_census_age_plot,
   nrow = 5,
-  rel_heights = c(1, 0.2, 1, 0.2, 1)
+  rel_heights = c(1, 0.2, 1, 0.2, 1),
+  labels = c("A", "", "B", "", "C")
 )
 
 ## Plot death year 

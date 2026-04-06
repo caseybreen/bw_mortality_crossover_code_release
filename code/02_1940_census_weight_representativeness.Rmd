@@ -219,7 +219,7 @@ dmf_clean_weights <- dmf_sibs_black %>%
     select(histid, weight, weight_conservative, byear, dyear, death_age, race = race.y, link_abe_exact_conservative, byeardiff_census_minus_dmf, bpl, census_age, weight_nchs, weight_1940_census)
 
 
-fwrite(dmf_clean_weights, here("data", "censoc_dmf_clean.csv"))
+fwrite(dmf_clean_weights, here("data", "censoc_dmf_clean_weighted.csv"))
 ```
 
 

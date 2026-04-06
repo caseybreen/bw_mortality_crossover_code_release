@@ -1,0 +1,364 @@
+---
+title: "Age heaping analysis"
+author: Casey Breen
+---
+
+Summary: investigate age heaping 
+
+```{r}
+## library packages 
+library(here)
+source(here("code", "helpers.R"))
+```
+
+```{r}
+bunmd <- fread(here("data", "bunmd_v2.csv"))
+```
+
+```{r}
+dmf_clean_joined <- dmf_clean %>% 
+  left_join(bunmd %>% select(ssn, dyear, byear, death_age), by = "ssn")
+```
+
+
+```{r}
+dmf_clean_joined %>% 
+  filter(dyear.x %in% 1988:2005) %>% 
+  summarize(mean(dyear.x == dyear.y, na.rm = T))
+
+dmf_clean_joined %>% 
+  filter(dyear.x %in% 1988:2005) %>% 
+  mutate(diff_deathage = death_age.x - death_age.y,
+         diff_dyear = dyear.x - dyear.y,
+         diff_byear = byear.x - byear.y) %>% 
+  count(diff_deathage)
+```
+
+
+```{r}
+bunmd_subsample <- bunmd %>% 
+  filter(dyear %in% c(1988:2005)) %>% 
+  filter(byear %in% 1890:1905) %>% 
+  group_by(byear) %>% 
+  filter(death_age != min(death_age)) %>% 
+  filter(race_first == 1 | race_first == 2) %>% 
+  mutate(race = case_when(
+    race_first == 1 ~ "White Americans",
+    race_first == 2 ~ "Black Americans"
+  ))
+  
+qx_point_estimate <- bunmd_subsample %>% 
+  filter(sex == 1) %>% 
+  calculate_qx() %>% 
+  group_by(death_age, race) %>%
+  summarize(qx = mean(qx, na.rm = TRUE))
+
+# Bootstrap and average hazards across byear within each bootstrap
+boot_df_1 <- replicate(bootstrap_n, {
+    bunmd_subsample %>%
+      filter(sex == 1) %>% 
+    sample_frac(replace = TRUE) %>%
+    calculate_qx() %>%
+    group_by(death_age, race) %>%
+    summarize(qx = mean(qx, na.rm = TRUE),
+              .groups = "drop")
+}, simplify = FALSE) %>%
+  bind_rows(.id = "bootstrap_id")
+
+# Summarize hazards across bootstraps
+qx_uncertainty <- boot_df_1 %>%
+  group_by(death_age, race) %>%
+  summarize(
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  ) 
+
+qx_uncertainty_point_estimate <- qx_uncertainty %>% 
+  left_join(qx_point_estimate, by = c("death_age", "race"))
+
+
+bunmd_men <- qx_uncertainty_point_estimate %>%
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  ggplot(aes(x = death_age, y = qx, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+ scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01),
+    limits = c(0.05, 0.5)
+  ) + 
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    title = "Men, Numident",
+    x = "Age",
+    y = expression("Probability of Dying " (q[x]))
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", linewidth = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  )
+```
+
+
+```{r}
+bunmd_subsample <- bunmd %>% 
+  filter(dyear %in% c(1988:2005)) %>% 
+  filter(byear %in% 1890:1905) %>% 
+  group_by(byear) %>% 
+  filter(death_age != min(death_age)) %>% 
+  filter(race_first == 1 | race_first == 2) %>% 
+  mutate(race = case_when(
+    race_first == 1 ~ "White Americans",
+    race_first == 2 ~ "Black Americans"
+  ))
+  
+qx_point_estimate <- bunmd_subsample %>% 
+  filter(sex == 2) %>% 
+  calculate_qx() %>% 
+  group_by(death_age, race) %>%
+  summarize(qx = mean(qx, na.rm = TRUE))
+
+# Bootstrap and average hazards across byear within each bootstrap
+boot_df_1 <- replicate(bootstrap_n, {
+    bunmd_subsample %>%
+  filter(sex == 2) %>% 
+    sample_frac(replace = TRUE) %>%
+    calculate_qx() %>%
+    group_by(death_age, race) %>%
+    summarize(qx = mean(qx, na.rm = TRUE),
+              .groups = "drop")
+}, simplify = FALSE) %>%
+  bind_rows(.id = "bootstrap_id")
+
+# Summarize hazards across bootstraps
+qx_uncertainty <- boot_df_1 %>%
+  group_by(death_age, race) %>%
+  summarize(
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  ) 
+
+qx_uncertainty_point_estimate <- qx_uncertainty %>% 
+  left_join(qx_point_estimate, by = c("death_age", "race"))
+
+
+bunmd_women <- qx_uncertainty_point_estimate %>%
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  ggplot(aes(x = death_age, y = qx, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+ scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01),
+    limits = c(0.05, 0.5)
+  ) + 
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    title = "Women, Numident",
+    x = "Age",
+    y = expression("Probability of Dying " (q[x]))
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", linewidth = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  )
+```
+
+
+```{r}
+## Read in dmf 
+numident <- fread(here("data", "censoc_numident_clean.csv"))
+
+## Restrict to ages 
+numident_filter <- numident %>% 
+  filter(byear %in% c(1890:1905)) %>% 
+  group_by(byear) %>% 
+  filter(death_age != min(death_age))  
+
+bootstrap_n = 100
+```
+
+## BW-Crossover
+
+```{r}
+qx_point_estimate <- numident_filter %>% 
+  filter(sex == 2) %>% 
+  calculate_qx() %>% 
+  group_by(death_age, race) %>%
+  summarize(qx = mean(qx, na.rm = TRUE))
+
+# Bootstrap and average hazards across byear within each bootstrap
+boot_df_1 <- replicate(bootstrap_n, {
+    numident_filter %>%
+      filter(sex == 2) %>% 
+    sample_frac(replace = TRUE) %>%
+    calculate_qx() %>%
+    group_by(death_age, race) %>%
+    summarize(qx = mean(qx, na.rm = TRUE),
+              .groups = "drop")
+}, simplify = FALSE) %>%
+  bind_rows(.id = "bootstrap_id")
+
+# Summarize hazards across bootstraps
+qx_uncertainty <- boot_df_1 %>%
+  group_by(death_age, race) %>%
+  summarize(
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  ) 
+
+qx_uncertainty_point_estimate <- qx_uncertainty %>% 
+  left_join(qx_point_estimate, by = c("death_age", "race"))
+
+# Plot
+pooled_bwcrossover_women <- qx_uncertainty_point_estimate %>%
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  ggplot(aes(x = death_age, y = qx, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+  scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01),
+    limits = c(0.05, 0.5)
+  ) + 
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    title = "Women, CenSoc-Numident",
+    x = "Age",
+    y = expression("Probability of Dying " (q[x]))
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", linewidth = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  )
+
+```
+
+
+
+## Numident
+
+```{r}
+## read in DMF 
+numident <- fread(here("data", "censoc_numident_v3_linked.csv")) %>% 
+  janitor::clean_names()
+
+## recode race 
+## restrict to conservative matches 
+## restrict to people born in the US 
+numident <- numident %>%
+  janitor::clean_names() %>%
+  mutate(race = case_when(
+    raced == 100 ~ "White Americans",
+    raced == 200 ~ "Black Americans"
+  )) %>%
+  filter(bpld < 15000) %>% 
+  filter(!is.na(race))
+
+## DMF clean 
+numident_clean <- numident %>%
+  select(histid, sex, weight, byear, dyear, death_age, race, bpl, age)
+
+fwrite(numident_clean, here("data", "censoc_numident_clean.csv"))
+```
+
+
+
+```{r}
+qx_point_estimate <- numident_filter %>% 
+  filter(sex == 1) %>% 
+  calculate_qx() %>% 
+  group_by(death_age, race) %>%
+  summarize(qx = mean(qx, na.rm = TRUE))
+
+# Bootstrap and average hazards across byear within each bootstrap
+boot_df_1 <- replicate(bootstrap_n, {
+    numident_filter %>%
+      filter(sex == 1) %>% 
+    sample_frac(replace = TRUE) %>%
+    calculate_qx() %>%
+    group_by(death_age, race) %>%
+    summarize(qx = mean(qx, na.rm = TRUE),
+              .groups = "drop")
+}, simplify = FALSE) %>%
+  bind_rows(.id = "bootstrap_id")
+
+# Summarize hazards across bootstraps
+qx_uncertainty <- boot_df_1 %>%
+  group_by(death_age, race) %>%
+  summarize(
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  ) 
+
+qx_uncertainty_point_estimate <- qx_uncertainty %>% 
+  left_join(qx_point_estimate, by = c("death_age", "race"))
+
+# Plot
+pooled_bwcrossover_men <- qx_uncertainty_point_estimate %>%
+  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  ggplot(aes(x = death_age, y = qx, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+ scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01),
+    limits = c(0.05, 0.5)
+  ) + 
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    title = "Men, CenSoc-Numident",
+    x = "Age",
+    y = expression("Probability of Dying " (q[x]))
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", linewidth = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  )
+```
+
+```{r}
+crossover_censoc_numident <- cowplot::plot_grid(bunmd_women, bunmd_men, pooled_bwcrossover_women, pooled_bwcrossover_men, labels = "AUTO")
+
+# Save plots
+ggsave(plot = crossover_censoc_numident, filename = here("figures", "appendix_bw_crossover_numident.png"), width = 11, height = 9, bg = "white")
+```
+
+
+

@@ -15,6 +15,11 @@ pacman::p_load(
   scales
 )
 
+
+## set parameters 
+
+bootstrap_n = 100
+
 ## function for recoding education
 recode_education <- function(df, educ_var) {
   df <- df  %>%
@@ -122,4 +127,11 @@ source_rmd = function(file, ...) {
   knitr::purl(file, output=tmp_file, quiet = T)
   source(file = tmp_file, ...)
 }
+
+## custom color schemes 
+## custom color schemes
+cudb <- c("#49b7fc", "#ff7b00", "#17d898", "#ff0083", "#0015ff", "#e5d200", "#999999")
+cud <- c("#D55E00", "#56B4E9", "#009E73", "#CC79A7", "#0072B2", "#E69F00", "#F0E442", "#999999")
+cbp1 <- c("#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
