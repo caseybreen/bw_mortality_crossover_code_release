@@ -1,4 +1,4 @@
-## Large-Scale Administrative Data Reveal Black-White Mortality Crossover is Not a Data Artifact
+## The Black-White Mortality Crossover: Evidence from Large-Scale Linked Administrative Data
 
 [![OSF](https://img.shields.io/badge/OSF-project-blue)]([https://osf.io/5e8wf/](https://osf.io/wcgfm/overview?view_only=d60dbcbb7b52490f808af829be1685d5))
 [![Generic badge](https://img.shields.io/badge/R-4.5.1-orange.svg)](https://cran.r-project.org/bin/macosx/)
