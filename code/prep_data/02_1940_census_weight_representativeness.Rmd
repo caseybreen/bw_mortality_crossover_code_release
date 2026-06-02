@@ -3,7 +3,7 @@ title: "Sample Representativeness"
 author: Casey Breen
 ---
 
-Summary: Assess sample representativeness and also try reweighting... 
+Summary: Assess sample representativeness and construct raking weights. 
 
 ```{r}
 ## library packages

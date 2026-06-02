@@ -1,0 +1,140 @@
+---
+title: "1900 Census Robustness"
+author: Casey Breen
+---
+
+Summary: Recalculate crossover using 
+
+
+```{r}
+## Library packages 
+library(here)
+source(here("code", "helpers.R"))
+
+## Read in dmf 
+dmf <- fread(here("data", "censoc_dmf_clean.csv"))
+
+## Read in dmf 
+crosswalk <- fread("~/workspace/data/usa_00040.csv.gz")
+```
+
+
+```{r}
+linked_sample <- dmf %>% 
+  left_join(crosswalk, by = c("histid" = "HISTID")) %>% 
+  filter(!is.na(AGE))
+
+crosswalk_1900 <- crosswalk %>% 
+  filter(YEAR == 1900) 
+
+linked_sample <- linked_sample %>% 
+  left_join(crosswalk_1900, by = "HIK")
+  
+
+linked_sample %>% 
+  filter(BIRTHYR.y != 9999) %>% 
+  mutate(diff = byear - BIRTHYR.y) %>% 
+  group_by(race) %>% 
+  count(diff) %>% 
+  mutate(prop = n / sum(n)) %>% 
+  View()
+```
+
+
+```{r}
+linked_sample_select <- linked_sample %>% 
+  filter(byear == BIRTHYR.y) %>% 
+  filter(1900 - AGE.y == byear | 1900 - AGE.y == byear + 1)
+
+```
+
+
+
+```{r}
+qx_point_estimate <- linked_sample_select %>% 
+  filter(byear %in% 1890:1900) %>% 
+  calculate_qx() %>% 
+  group_by(death_age, race) %>%
+  summarize(qx = mean(qx, na.rm = TRUE))
+
+# Bootstrap and average hazards across byear within each bootstrap
+boot_df_1 <- replicate(bootstrap_n, {
+  linked_sample_select %>%
+      filter(byear %in% 1890:1900) %>% 
+    sample_frac(replace = TRUE) %>%
+    calculate_qx() %>%
+    group_by(death_age, race) %>%
+    summarize(qx = mean(qx, na.rm = TRUE),
+              .groups = "drop")
+}, simplify = FALSE) %>%
+  bind_rows(.id = "bootstrap_id")
+
+# Summarize hazards across bootstraps
+qx_uncertainty <- boot_df_1 %>%
+  group_by(death_age, race) %>%
+  summarize(
+    mean_hazard = mean(qx, na.rm = TRUE),
+    lower_ci = quantile(qx, 0.025, na.rm = TRUE),
+    upper_ci = quantile(qx, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  ) 
+
+qx_uncertainty_point_estimate_dmf_men <- qx_uncertainty %>% 
+  left_join(qx_point_estimate, by = c("death_age", "race"))
+
+# Plot
+pooled_bwcrossover <- qx_uncertainty_point_estimate_dmf_men %>%
+  filter(death_age %in% 75:95, race %in% c("White Men", "Black Men")) %>%
+  ggplot(aes(x = death_age, y = qx, color = race)) +
+  geom_line() +
+  geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
+  # geom_vline(xintercept = 81.5, linetype = "dashed", color = "grey") +
+  # geom_vline(xintercept = 86.5, linetype = "dashed", color = "grey") +
+  theme_cowplot() +
+  ggsci::scale_colour_lancet() +
+  scale_y_continuous(
+    trans = "log",
+    breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
+    labels = scales::number_format(accuracy = 0.01)
+  ) + 
+  scale_shape_manual(values = c(21, 24)) +
+  labs(
+    x = "Age",
+    y = expression("Probability of Dying " (q[x]))
+  ) +
+  theme(
+    legend.position = c(0.999, 0.001),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+    legend.background = element_rect(color = "black", linewidth = 0.5, linetype = "solid"),
+    legend.title = element_blank()
+  ) 
+  coord_cartesian(clip = "off")  
+  
+
+
+mort_ratio_exact_match <- qx_point_estimate %>%
+    filter(death_age %in% 75:95, race %in% c("White Men", "Black Men")) %>%
+  select(race, death_age, qx) %>%
+  pivot_wider(names_from = race, values_from = qx) %>%
+  mutate(bw_ratio = `Black Men` / `White Men`) %>% 
+  filter(death_age %in% c(75:100))
+
+ratio_plot_exact_match <- ggplot(mort_ratio_exact_match, aes(x = death_age, y = bw_ratio)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_smooth(method = "lm", se = F) + 
+  labs(
+    x = "Age",
+    y = "Death Probability Ratio \n (Black / White)",
+    title = ""
+    ) +
+    ylim(0.8, 1.35)+ 
+  cowplot::theme_cowplot()
+
+appendix_bw_crossover_1900_linkage <- cowplot::plot_grid(pooled_bwcrossover, ratio_plot_exact_match, labels = "AUTO")
+
+ggsave(plot = appendix_bw_crossover_1900_linkage, filename = here("figures", "appendix_bw_crossover_1900_linkage.png"), width = 10, height = 4, bg = "white")
+```
+

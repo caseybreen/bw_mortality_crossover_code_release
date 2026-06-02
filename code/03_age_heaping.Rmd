@@ -150,3 +150,121 @@ heaping_combined_plot <- cowplot::plot_grid(
 ggsave(plot = heaping_combined_plot, filename = here("figures", "fig3_age_heaping_plot.png"), width = 8, height = 10, bg = "white")
 ```
 
+
+
+```{r}
+whipple <- function(x) {
+  # x is a vector of individual ages/years
+  n_05    <- sum(x %% 10 %in% c(0, 5))
+  n_total <- length(x)
+  (n_05 / (n_total / 5)) * 100
+}
+```
+
+
+
+```{r}
+myers <- function(x) {
+  # Myers' Blended Index of digit preference
+  # x: vector of individual ages or years
+  # Returns index from 0 (no heaping) to 90 (maximum heaping)
+  # Interpretation: <5 = very accurate, 5-10 = acceptable, >15 = rough
+  
+  min_x <- min(x)
+  max_x <- max(x)
+  
+  # Build frequency table over full range
+  all_vals <- min_x:max_x
+  counts <- setNames(integer(length(all_vals)), all_vals)
+  tab <- table(x)
+  counts[names(tab)] <- as.integer(tab)
+  
+  blended <- setNames(numeric(10), 0:9)
+  
+  for (d in 0:9) {
+    vals_d <- all_vals[all_vals %% 10 == d]
+    
+    if (length(vals_d) == 0) next
+    if (length(vals_d) == 1) {
+      blended[d + 1] <- counts[as.character(vals_d)]
+      next
+    }
+    
+    pop_d <- counts[as.character(vals_d)]
+    
+    # Sum 1: all K terms
+    s1 <- sum(pop_d)
+    
+    # Sum 2: drop youngest (shifts range up by one decade)
+    # This is the "blending" — corrects for unequal endpoint representation
+    s2 <- sum(pop_d[-1])
+    
+    # Average the two sums — gives half-weight to youngest endpoint
+    blended[d + 1] <- (s1 + s2) / 2
+  }
+  
+  # Percent per digit (should be 10% each if no heaping)
+  pct <- blended / sum(blended) * 100
+  
+  # Myers index = half sum of absolute deviations from 10%
+  round(sum(abs(pct - 10)) / 2, 1)
+}
+
+whipple_adj <- function(x) {
+  # Computes expected proportion of 0/5 terminal digits 
+  # based on actual range, not assuming 2/10
+  range_vals    <- min(x):max(x)
+  expected_prop <- mean(range_vals %% 10 %in% c(0, 5))
+  observed_prop <- mean(x %% 10 %in% c(0, 5))
+  (observed_prop / expected_prop) * 100
+}
+```
+
+
+
+```{r}
+age_report_stats <- bind_rows(
+  dmf %>% group_by(race) %>%
+    summarise(whipple = whipple_adj(census_age), myers = myers(census_age)) %>% 
+    mutate(variable = "Census Age"),
+  dmf %>% group_by(race) %>% 
+    summarise(whipple = whipple_adj(byear), myers = myers(byear)) %>% 
+    mutate(variable = "Birth Year"),
+  dmf %>% group_by(race) %>% 
+    summarise(whipple = whipple_adj(death_age), myers = myers(death_age)) %>% 
+    mutate(variable = "Age at Death"),
+  dmf %>% group_by(race) %>% 
+    summarise(whipple = whipple_adj(dyear), myers = myers(dyear)) %>% 
+    mutate(variable = "Death Year")
+) %>%
+  select(variable, race, whipple, myers) %>%
+  arrange(variable, race)
+
+
+age_report_stats %>% 
+  select(variable, race, whipple, myers) %>%
+  arrange(variable, race) %>%
+  rename(
+    Variable = variable,
+    Group    = race,
+    Whipple  = whipple,
+    Myers    = myers
+  ) %>%
+  kbl(
+    format   = "latex",
+    booktabs = TRUE,
+    caption  = "Age Heaping Diagnostics for Linked CenSoc-DMF Sample",
+    label    = "heaping",
+    digits   = 1,
+    na_string = "--"
+  ) %>%
+  collapse_rows(columns = 1, latex_hline = "none") %>%
+  add_header_above(c(" " = 2, "Index" = 2))  %>%
+  save_kable(here("figures", "tab_heaping_diagnostics.tex"))
+```
+
+
+
+
+
+

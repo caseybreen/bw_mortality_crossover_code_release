@@ -12,9 +12,12 @@ source(here("code", "helpers.R"))
 ```
 
 ```{r}
+## read in bunmd
 bunmd <- fread(here("data", "bunmd_v2.csv"))
-```
 
+## Read in numident 
+censoc_numident <- fread(here("data", "censoc_numident_clean.csv"))
+```
 
 ## BUNMD Men 
 
@@ -180,9 +183,6 @@ bunmd_women <- qx_uncertainty_point_estimate_bunmd_women %>%
 
 
 ```{r}
-## Read in numident 
-censoc_numident <- fread(here("data", "censoc_numident_clean.csv"))
-
 ## Restrict to ages 
 censoc_numident <- censoc_numident %>% 
   filter(byear %in% c(1890:1905)) %>% 
@@ -335,111 +335,5 @@ crossover_censoc_numident <- cowplot::plot_grid(bunmd_women, bunmd_men, pooled_b
 ggsave(plot = crossover_censoc_numident, filename = here("figures", "appendix_bw_crossover_numident.png"), width = 11, height = 9, bg = "white")
 ```
 
-
-```{r}
-# df_men <- qx_uncertainty_point_estimate_numident_men %>%
-#   mutate(source = "CenSoc-Numident (men)") %>%
-#   bind_rows(
-#     qx_uncertainty_point_estimate_bunmd_men %>%
-#       mutate(source = "BUNMD (men)")
-#   ) %>%
-#   bind_rows(qx_uncertainty_point_estimate_dmf_men %>% 
-#       mutate(source = "DMF (men)")) %>% 
-#   filter(
-#     death_age %in% 75:100,
-#   ) %>%
-#   mutate(race = case_when(
-#     race == "Black Americans" ~ "Black Men",
-#     race == "White Americans" ~ "White Men",
-#     TRUE ~ race
-#   )) %>% 
-#   mutate(
-#     race   = factor(race, levels = c("Black Men", "White Men")),
-#     source = factor(source)
-#   )
-# 
-# ggplot(df_men,
-#        aes(x = death_age, y = qx, color = source, shape = source)) +
-#   geom_line() +
-#   geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci),
-#                   size = 0.75, fill = "white") +
-#   theme_cowplot() +
-#   scale_color_viridis_d() +
-#   scale_y_continuous(
-#     trans  = "log",
-#     breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
-#     labels = scales::number_format(accuracy = 0.01),
-#     limits = c(0.05, 0.5)
-#   ) +
-#   scale_shape_manual(values = c(21, 24, 22)) +
-#   scale_color_manual(values = cud) + 
-#   labs(
-#     title = "Men, CenSoc-Numident",
-#     x = "Age",
-#     y = expression("Probability of Dying " (q[x])),
-#     color = NULL,
-#     shape = NULL
-#   ) +
-#   facet_wrap(~ race, nrow = 1) +
-#   theme(
-#     legend.position   = "bottom",
-#     legend.box.just   = "center",
-#     legend.background = element_rect(color = "black", linewidth = 0.5),
-#     strip.background  = element_rect(fill = "grey85"),
-#     strip.text        = element_text(face = "bold")
-#   )
-
-```
-
-```{r}
-# df_women <- qx_uncertainty_point_estimate_numident_women %>%
-#   mutate(source = "CenSoc-Numident (women)") %>%
-#   bind_rows(
-#     qx_uncertainty_point_estimate_bunmd_women %>%
-#       mutate(source = "BUNMD (women)")
-#   ) %>%
-#   filter(
-#     death_age %in% 75:100) %>%
-#   mutate(race = case_when(
-#     race == "Black Americans" ~ "Black Women",
-#     race == "White Americans" ~ "White Women",
-#     TRUE ~ race
-#   )) %>% 
-#   mutate(
-#     race   = factor(race, levels = c("Black Women", "White Women")),
-#     source = factor(source))
-# 
-# ggplot(df_women,
-#        aes(x = death_age, y = qx, color = source, shape = source)) +
-#   geom_line() +
-#   geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci),
-#                   size = 0.75, fill = "white") +
-#   theme_cowplot() +
-#   scale_y_continuous(
-#     trans  = "log",
-#     breaks = c(0.1, 0.2, 0.3, 0.4, 0.5),
-#     labels = scales::number_format(accuracy = 0.01),
-#     limits = c(0.05, 0.5)
-#   ) +
-#   scale_shape_manual(values = c(21, 24)) +
-#   scale_shape_manual(values = c(21, 24, 22)) +
-#   scale_color_manual(values = cud) + 
-#   labs(
-#     title = "Women, CenSoc-Numident",
-#     x = "Age",
-#     y = expression("Probability of Dying " (q[x])),
-#     color = NULL,
-#     shape = NULL
-#   ) +
-#   facet_wrap(~ race, nrow = 1) +
-#   theme(
-#     legend.position      = "bottom",
-#     legend.box.just      = "center",
-#     legend.background    = element_rect(color = "black",
-#                                         linewidth = 0.5),
-#     strip.background     = element_rect(fill = "grey85"),
-#     strip.text           = element_text(face = "bold")
-#   )
-```
 
 

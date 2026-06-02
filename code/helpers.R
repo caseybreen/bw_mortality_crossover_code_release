@@ -12,7 +12,8 @@ pacman::p_load(
   RColorBrewer,
   ipumsr,
   gompertztrunc,
-  scales
+  scales,
+  kableExtra
 )
 
 
