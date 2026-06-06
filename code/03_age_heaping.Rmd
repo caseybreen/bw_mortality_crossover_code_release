@@ -147,7 +147,7 @@ heaping_combined_plot <- cowplot::plot_grid(
 )
 
 ## Plot death year 
-ggsave(plot = heaping_combined_plot, filename = here("figures", "fig3_age_heaping_plot.png"), width = 8, height = 10, bg = "white")
+ggsave(plot = heaping_combined_plot, filename = here("figures", "fig4_age_heaping_plot.png"), width = 8, height = 10, bg = "white")
 ```
 
 
@@ -165,48 +165,25 @@ whipple <- function(x) {
 
 ```{r}
 myers <- function(x) {
-  # Myers' Blended Index of digit preference
-  # x: vector of individual ages or years
-  # Returns index from 0 (no heaping) to 90 (maximum heaping)
-  # Interpretation: <5 = very accurate, 5-10 = acceptable, >15 = rough
-  
-  min_x <- min(x)
+  x <- x[is.finite(x)]
+  start <- min(x)
+  # align start to a decade boundary so each digit's cells line up
+  base <- start - (start %% 10)
   max_x <- max(x)
-  
-  # Build frequency table over full range
-  all_vals <- min_x:max_x
-  counts <- setNames(integer(length(all_vals)), all_vals)
-  tab <- table(x)
-  counts[names(tab)] <- as.integer(tab)
-  
-  blended <- setNames(numeric(10), 0:9)
-  
-  for (d in 0:9) {
-    vals_d <- all_vals[all_vals %% 10 == d]
-    
-    if (length(vals_d) == 0) next
-    if (length(vals_d) == 1) {
-      blended[d + 1] <- counts[as.character(vals_d)]
-      next
-    }
-    
-    pop_d <- counts[as.character(vals_d)]
-    
-    # Sum 1: all K terms
-    s1 <- sum(pop_d)
-    
-    # Sum 2: drop youngest (shifts range up by one decade)
-    # This is the "blending" — corrects for unequal endpoint representation
-    s2 <- sum(pop_d[-1])
-    
-    # Average the two sums — gives half-weight to youngest endpoint
-    blended[d + 1] <- (s1 + s2) / 2
-  }
-  
-  # Percent per digit (should be 10% each if no heaping)
+  decades <- seq(base, max_x, by = 10)        # number of full decades K
+  K <- length(decades)
+
+  tab <- table(factor(x, levels = base:(base + 10 * K - 1)))
+  counts <- as.integer(tab)
+  m <- matrix(counts, nrow = 10)              # rows = digit 0..9, cols = decade
+
+  # coefficient set 1: weight decade j (1-indexed) by j, starting digit's 1st occurrence
+  w1 <- seq_len(K)
+  # coefficient set 2: weight by (K-1)..0, starting digit's 2nd occurrence
+  w2 <- c(0, rev(seq_len(K - 1)))
+
+  blended <- as.numeric(m %*% w1 + m %*% w2)
   pct <- blended / sum(blended) * 100
-  
-  # Myers index = half sum of absolute deviations from 10%
   round(sum(abs(pct - 10)) / 2, 1)
 }
 
@@ -219,6 +196,55 @@ whipple_adj <- function(x) {
   (observed_prop / expected_prop) * 100
 }
 ```
+
+
+```{r}
+tab <- as.data.frame(table(dmf$death_age), stringsAsFactors = FALSE)
+names(tab) <- c("age", "n")
+tab$age <- as.integer(tab$age)
+
+# 1. DemoTools as the reference
+ref <- DemoTools::check_heaping_myers(
+  Value  = tab$n,
+  Age    = tab$age,
+  ageMin = 65,
+  ageMax = 105
+)
+
+ref
+
+# 2. your function on the same individual-level data, same window
+mine <- myers(dmf$death_age[dmf$death_age >= 65 & dmf$death_age < 105])
+
+  dmf %>% group_by(race) %>%
+    summarize(myers(death_age))
+```
+
+
+```{r}
+myers <- function(x) {
+  x <- x[is.finite(x)]
+
+  lo <- min(x)   # round down to decade start
+  hi <- max(x)             # round down to decade boundary
+
+
+  tab <- as.data.frame(
+    table(factor(x, levels = lo:max(x))),
+    stringsAsFactors = FALSE
+  )
+  names(tab) <- c("val", "n")
+  tab$val <- as.integer(tab$val)
+
+  DemoTools::check_heaping_myers(
+    Value  = tab$n,
+    Age    = tab$val,
+    ageMin = lo,
+    ageMax = hi
+  )
+}
+```
+
 
 
 
@@ -262,7 +288,6 @@ age_report_stats %>%
   add_header_above(c(" " = 2, "Index" = 2))  %>%
   save_kable(here("figures", "tab_heaping_diagnostics.tex"))
 ```
-
 
 
 

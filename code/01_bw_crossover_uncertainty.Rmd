@@ -97,7 +97,7 @@ pooled_bwcrossover <- qx_uncertainty_point_estimate_dmf_men %>%
 
 
 # Save plots
-ggsave(plot = pooled_bwcrossover, filename = here("figures", "fig1_bw_crossover_1890_1905.png"), width = 8.3, height = 4.5, bg = "white")
+ggsave(plot = pooled_bwcrossover, filename = here("figures", "fig2_bw_crossover_1890_1905.png"), width = 8.3, height = 4.5, bg = "white")
 ```
 
 
@@ -602,14 +602,14 @@ ratio_plot_census_weights_exactmatch <- ggplot(mort_ratio, aes(x = death_age, y 
 ```{r}
 crossover_census_weights_checks <- cowplot::plot_grid(pooled_bwcrossover_census_weights_nonheaped, ratio_plot_census_weights_nonheaped, pooled_bwcrossover_census_weights_exactmatch, ratio_plot_census_weights_exactmatch,  labels = "AUTO")
 
-ggsave(plot = crossover_census_weights_checks, filename = here("figures", "crossover_census_weights_1940census_weights.png"), width = 12, height = 8, bg = "white")
+ggsave(plot = crossover_census_weights_checks, filename = here("figures", "appendix_crossover_census_weights_1940census_weights.png"), width = 12, height = 8, bg = "white")
 ```
 
 
 ```{r}
 fig3_robustness <- cowplot::plot_grid(pooled_bwcrossover_nonheaped, ratio_plot_nonheaped, pooled_bwcrossover_exact, ratio_plot_exact_match,pooled_bwcrossover_nchs_weights,  ratio_plot_nchs_weights, pooled_bwcrossover_census_weights, ratio_plot_census_weights, ncol = 2, labels = "AUTO")
 
-ggsave(plot = fig3_robustness, filename = here("figures", "fig4_bw_crossover_1890_1905_robustness.png"), width = 12, height = 14, bg = "white")
+ggsave(plot = fig3_robustness, filename = here("figures", "fig5_bw_crossover_1890_1905_robustness.png"), width = 12, height = 14, bg = "white")
 ```
 
 ## Crossover by birth cohort 
@@ -662,7 +662,7 @@ crossover_by_cohort <- ggplot(df_wide, aes(x = death_age, y = diff_bw, group = b
     legend.text = element_text(size = 11)
   ) 
 
-  ggsave(plot = crossover_by_cohort, filename = here("figures", "fig2_bw_crossover_1890_1905_by_cohort.png"), width = 10, height = 10, bg = "white")
+  ggsave(plot = crossover_by_cohort, filename = here("figures", "fig3_bw_crossover_1890_1905_by_cohort.png"), width = 10, height = 10, bg = "white")
 ```
 
 ## summary stats 

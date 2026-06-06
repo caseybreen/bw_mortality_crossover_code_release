@@ -1,0 +1,273 @@
+---
+title: "Age Heaping Simulation"
+author: Casey Breen
+---
+
+Summary: Simulate two populations from the same Gompertz curve. One has no heaping
+(Myers' ≈ 0), the other has birth-year heaping — 1% of individuals have their age
+rounded to the nearest 5 (e.g. age 71/72 → 70), giving Myers' ≈ 1. Plot both hazard
+curves from age 65–100.
+
+```{r setup}
+library(here)
+source(here("code", "helpers.R")) 
+set.seed(1)
+```
+
+## Myers' index
+
+```{r myers}
+myers <- function(x) {
+  min_x <- min(x); max_x <- max(x)
+  all_vals <- min_x:max_x
+  counts <- setNames(integer(length(all_vals)), all_vals)
+  tab <- table(x)
+  counts[names(tab)] <- as.integer(tab)
+
+  blended <- setNames(numeric(10), 0:9)
+
+  for (d in 0:9) {
+    vals_d <- all_vals[all_vals %% 10 == d]
+    if (length(vals_d) == 0) next
+    if (length(vals_d) == 1) {
+      blended[d + 1] <- counts[as.character(vals_d)]
+      next
+    }
+    pop_d <- counts[as.character(vals_d)]
+    blended[d + 1] <- (sum(pop_d) + sum(pop_d[-1])) / 2
+  }
+
+  pct <- blended / sum(blended) * 100
+  sum(abs(pct - 10)) / 2
+}
+```
+
+
+
+```{r}
+heap_ages <- function(ages, p) {
+  ifelse(
+    runif(length(ages)) < p,
+    round(ages / 5L) * 5L,
+    ages
+  )
+}
+
+## now we try calibrating the heaping 
+calibrate_heaping <- function(ages, target, grid = seq(0, 0.1, by = 0.0005)) {
+  sims <- purrr::map_dfr(grid, function(p) {
+    age_h <- heap_ages(ages, p)
+    tibble::tibble(
+      p_heap = p,
+      myers = myers(age_h)
+    )
+  })
+
+  sims %>%
+    mutate(abs_diff = abs(myers - target)) %>%
+    slice_min(abs_diff, n = 1, with_ties = FALSE)
+}
+```
+
+
+
+## Simulate and apply heaping
+
+```{r simulate}
+N  <- 2e6
+a0 <- 1.5e-5
+b  <- 0.092
+
+ages_true <- gompertztrunc_simu(
+  n = N, a0 = a0, b = b,
+  formula = death_age ~ sex, coefs = c(sex = 0), dummy = TRUE
+) %>%
+  mutate(age = as.integer(floor(death_age))) %>%
+  pull(age)
+
+cal_04 <- calibrate_heaping(ages_true, target = 0.4)
+cal_06 <- calibrate_heaping(ages_true, target = 10)
+
+p_04 <- cal_04$p_heap
+p_06 <- cal_06$p_heap
+
+ages_04 <- heap_ages(ages_true, p_04)
+ages_06 <- heap_ages(ages_true, p_06)
+ 
+m_04 <- myers(ages_04)
+m_06 <- myers(ages_06)
+
+cat(sprintf(
+  "Myers' target 0.4: observed %.1f, p_heap = %.4f\n",
+  m_04, p_04
+))
+
+cat(sprintf(
+  "Myers' target 6: observed %.1f, p_heap = %.4f\n",
+  m_06, p_06
+))
+```
+
+
+## Life-table hazard curves
+
+```{r hazards}
+## Life-table hazard curves
+compute_hx <- function(ages, age_range = 65:100) {
+  counts <- table(factor(ages[ages %in% age_range], levels = age_range))
+
+  tibble(age = age_range, dx = as.integer(counts)) %>%
+    mutate(
+      lx     = sum(dx) - dplyr::lag(cumsum(dx), default = 0),
+      hx     = dx / (lx - dx / 2),
+      log_hx = log(hx)
+    ) %>%
+    filter(lx > 200, age < max(age_range), is.finite(log_hx))
+}
+
+hx_04 <- compute_hx(ages_04) %>%
+  mutate(group = sprintf("Myers' = %.1f", m_04))
+
+hx_06 <- compute_hx(ages_06) %>%
+  mutate(group = sprintf("Myers' = %.1f", m_06))
+
+hx_plot <- bind_rows(hx_04, hx_06)
+```
+
+
+## Plot
+
+```{r plot, fig.width = 6.5, fig.height = 4.5}
+## Plot
+
+lt_labels <- c(
+  sprintf("Myers' = %.1f", m_04),
+  sprintf("Myers' = %.1f", m_06)
+)
+
+heaping_sim_plot <- hx_plot %>%
+  ggplot(aes(x = age, y = log_hx, color = group, linetype = group)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(
+    values = setNames(c("steelblue", "#D55E00"), lt_labels)
+  ) +
+  scale_linetype_manual(
+    values = setNames(c("solid", "dashed"), lt_labels)
+  ) +
+  cowplot::theme_cowplot() +
+  labs(
+    x        = "Age",
+    y        = "log h(x)",
+    color    = NULL,
+    linetype = NULL) + 
+  theme(legend.position = "bottom") + 
+  xlim(65, 95)
+
+heaping_sim_plot
+
+ggsave(
+  plot     = heaping_sim_plot,
+  filename = here("figures", "fig_heaping_simulation.png"),
+  width    = 6,
+  height   = 4,
+  bg       = "white"
+)
+```
+
+
+
+```{r}
+ages_true_exaggerated <- ages_true +
+  ifelse(runif(length(ages_true)) < 0.50,
+         sample(c(-10,10), length(ages_true), replace = TRUE),
+         0L)
+
+ages_true_understatement <- ages_true -
+  ifelse(runif(length(ages_true)) < 0.50,
+         sample(1:5, length(ages_true), replace = TRUE),
+         0L)
+hx_04 <- compute_hx(ages_true) %>%
+  mutate(group = "Baseline")
+
+hx_06 <- compute_hx(ages_true_exaggerated) %>%
+  mutate(group = "Age overstatement (50% chance, random 1-5 years)")
+
+hx_08 <- compute_hx(ages_reported) %>%
+  mutate(group = "Age understatement (50% chance, random 1-5 year)")
+
+lt_labels <- c("Baseline", "Age overstatement (50% chance, random 1-5 years)", "Age understatement (50% chance, random 1-5 year)")
+
+hx_plot <- bind_rows(hx_04, hx_06)
+
+heaping_sim_plot <- hx_plot %>%
+  ggplot(aes(x = age, y = hx, color = group, linetype = group)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(
+    values = setNames(c("steelblue", "#D55E00", "darkgreen"), lt_labels)
+  ) +
+  scale_linetype_manual(
+    values = setNames(c("solid", "dashed", "dotdash"), lt_labels)
+  ) +
+  cowplot::theme_cowplot() +
+  labs(
+    x        = "Age",
+    y        = "log h(x)",
+    color    = NULL,
+    linetype = NULL) + 
+  theme(legend.position = "bottom") + 
+  xlim(65, 95) + 
+  scale_y_log10()
+
+heaping_sim_plot
+
+ggsave(
+  plot     = heaping_sim_plot,
+  filename = here("figures", "heaping_sim_plot_v2.png"),
+  width    = 6,
+  height   = 4,
+  bg       = "white"
+)
+```
+
+```{r}
+N  <- 2e6
+a0 <- 1.5e-5
+b  <- 1/10
+
+ages_true <- gompertztrunc_simu(
+  n = N, a0 = a0, b = b,
+  formula = death_age ~ sex, coefs = c(sex = 0), dummy = TRUE
+) %>%
+  mutate(age = as.integer(floor(death_age))) %>%
+  pull(age)
+
+
+
+```
+
+
+```{r}
+a = 1.5e-5
+b = 1/10
+x = 0:110
+hx = a * exp(b*x)
+Hx = c(0, cumsum(hx))
+lx <- exp(-Hx)
+dx <- hx* lx[-length(x)]
+Dx <- round(100000*dx)
+## compute reverse survival
+( lx <- rev(cumsum(rev(Dx))) )
+s = x %in% 60:100
+plot(x[s], (Dx/lx)[s], log = 'y', type = 'l')
+## now do some random errors
+X <- rep(x, Dx)
+X_plus_error = X + sample(c(-10, 0, 10),
+                          size = length(X),
+                          prob = c(.25,.5,.25),
+                          replace = TRUE)
+Dx_plus_error <- table(factor(X_plus_error, levels = x))
+lx_plus_error = rev(cumsum(rev(Dx_plus_error)))
+qx_plus_error = Dx_plus_error/lx_plus_error
+lines(x[s], as.vector(qx_plus_error)[s], col = 'red')
+```
+

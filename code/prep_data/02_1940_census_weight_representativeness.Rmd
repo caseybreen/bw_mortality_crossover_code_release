@@ -14,11 +14,11 @@ source(here("code", "helpers.R"))
 dmf <- fread(here("data", "censoc_dmf_clean.csv"))
 
 ## read in 1940 census 
-census_1940 <- fread("~/workspace/data/P.tsv", select = c("HISTID", "SERIALP", "AGE", "INCWAGE", "SEX", "EDUC", "RACE", "RELATE", "MARST", "SEI")) %>% 
+census_1940 <- fread("~/workspace/data/1940/P.tsv", select = c("HISTID", "SERIALP", "AGE", "INCWAGE", "SEX", "EDUC", "RACE", "RELATE", "MARST", "SEI")) %>% 
   janitor::clean_names()
 
 ## read in 1940 census household
-census_1940_h <- fread("~/workspace/data/H.tsv", select = c("SERIAL", "STATEFIP", "OWNERSHP", "URBAN", "REGION")) %>% 
+census_1940_h <- fread("~/workspace/data/1940/H.tsv", select = c("SERIAL", "STATEFIP", "OWNERSHP", "URBAN", "REGION")) %>% 
   janitor::clean_names()
 ```
 
@@ -47,7 +47,7 @@ census_1940_hh_vars <- census_1940_hh_vars %>%
 ## recode variables 
 census_1940_hh_vars <- census_1940_hh_vars %>% 
   mutate(race = race.x) %>% 
-  filter(age %in% c(32:50)) %>% 
+  filter(age %in% c(35:50)) %>% 
   mutate(match_conservative = case_when(
     link_abe_exact_conservative == 1 ~ "Matched",
     TRUE ~ "Unmatched"
@@ -118,7 +118,7 @@ census_1940_hh_vars <- census_1940_hh_vars %>%
 
 ```{r}
 ## tabulations for men in 1940 census 
-census_characteristics <- census_1940_hh_vars %>%     
+census_characteristics <- census_1940_hh_vars %>%   
  select(histid, Education, SES, Marriage, Region, Rural, Home, Race) %>%
   pivot_longer(-c(histid, Race)) %>% 
   group_by(name, value, Race) %>%
@@ -178,13 +178,21 @@ rep_plot <- combined_characteristics %>%
   scale_color_manual(name = "", values = c("1940 Census" = "black", 'Censoc-DMF' = "red")) + 
   scale_x_continuous(labels = scales::percent_format(scale = 1)) + 
   theme_bw() +
-  theme(legend.position=c(.915, .945),
+  theme(legend.position=c(.9223, .952),
         legend.direction='vertical',
         legend.margin=margin(t=0, unit='cm'),
         legend.box.background = element_rect(colour = "black"),
-        legend.title=element_blank()) 
+        legend.title=element_blank(),
+    strip.background = element_rect(fill = "white", color = "black", linewidth = 0.8),
+    strip.text = element_text(size = 11, face = "bold", color = "black"),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.background = element_rect(fill = "#f9f9f9", color = NA),
+    panel.grid = element_line(color = "grey95"),
+    panel.spacing = unit(.5, "lines"),
+    axis.title.x = element_text(face = "bold")
+  )
 
-ggsave(rep_plot, filename = here("figures/appendix_representativeness_plot.png"), height = 6, width = 9)
+ggsave(rep_plot, filename = here("figures/fig1_representativeness_plot.png"), height = 6, width = 9)
 ```
 
 

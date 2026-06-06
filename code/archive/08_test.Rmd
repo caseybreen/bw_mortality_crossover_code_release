@@ -1,0 +1,216 @@
+---
+title: "Age heaping simulation"
+output: html_notebook
+---
+
+```{r setup}
+library(here)
+source(here("code", "helpers.R"))
+set.seed(1)
+```
+
+
+## Parameters
+
+```{r params}
+a  <- 1e-4
+b  <- 1/10
+
+## Error model: every death age shifted ±4 years with equal probability
+err_vals <- c(5, 0,  5)
+err_prob <- c(.1, .8, .1)
+
+age_full  <- 0:110
+age_err   <- -4:114       ## extended range to hold shifted ages
+plot_ages <- 60:95       ## stop at 95: below that, <400 deaths and estimates get noisy
+```
+
+
+## Approach 1: Analytic life table
+
+```{r analytic}
+## Gompertz cumulative hazard at integer boundaries
+bounds <- 0:111
+Hx     <- (a / b) * (exp(b * bounds) - 1)
+lx     <- exp(-Hx)
+
+## Deaths in each year-of-age interval
+dx <- lx[-length(lx)] - lx[-1]
+Dx <- round(1e7 * dx)                         ## 10M cohort: stable estimates at old ages
+
+## Life table from unshifted ages
+lx_an <- rev(cumsum(rev(Dx)))
+qx_an <- setNames(Dx / lx_an, age_full)
+
+## Apply errors to every individual
+X        <- rep(age_full, Dx)
+X_err_an <- X + sample(err_vals, length(X), prob = err_prob, replace = TRUE)
+
+## Life table from shifted ages (over extended range so no deaths fall outside)
+Dx_an_e  <- as.integer(table(factor(X_err_an, levels = age_err)))
+lx_an_e  <- rev(cumsum(rev(Dx_an_e)))
+qx_an_e  <- setNames(Dx_an_e / lx_an_e, age_err)
+```
+
+
+## Approach 2: Simulation via gompertztrunc_simu
+
+```{r simulate}
+N <- 2e7
+
+ages_sim <- gompertztrunc_simu(
+  n       = N,
+  a0      = a,
+  b       = b,
+  formula = death_age ~ sex,
+  coefs   = c(sex = 0),
+  dummy   = TRUE
+) %>%
+  mutate(age = as.integer(floor(death_age))) %>%
+  pull(age)
+
+## Apply the same errors
+ages_sim_e <- ages_sim + sample(err_vals, N, prob = err_prob, replace = TRUE)
+
+## Scale counts to match the 10M analytic cohort
+scale    <- 1e7 / N
+Dx_sim_e <- round(as.integer(table(factor(ages_sim_e, levels = age_err))) * scale)
+lx_sim_e <- rev(cumsum(rev(Dx_sim_e)))
+qx_sim_e <- setNames(Dx_sim_e / lx_sim_e, age_err)
+```
+
+
+## Plot: both curves on top of each other
+
+```{r plot, fig.width = 7, fig.height = 4.5}
+s <- as.character(plot_ages)
+
+tibble(
+  age         = plot_ages,
+  Analytic    = as.numeric(qx_an_e[s]),
+  Simulation  = as.numeric(qx_sim_e[s])
+) %>%
+  pivot_longer(-age, names_to = "method", values_to = "qx") %>%
+  ggplot(aes(x = age, y = qx, color = method, linetype = method)) +
+  geom_line(linewidth = 1) +
+  scale_y_log10() +
+  scale_color_manual(values = c("steelblue", "#D55E00")) +
+  scale_linetype_manual(values = c("solid", "dashed")) +
+  cowplot::theme_cowplot() +
+  labs(
+    x = "Age", y = "q(x)  [log scale]",
+    color = NULL, linetype = NULL,
+    title    = "Analytic vs. simulation: identical Gompertz + ±4 year errors",
+    subtitle = sprintf("Gompertz a = %.0e, b = %.1f. Every death shifted ±4 yrs (prob 0.5 each).", a, b)
+  ) +
+  theme(legend.position = "bottom", plot.subtitle = element_text(size = 9))
+```
+
+
+## Alignment check
+
+```{r alignment, fig.width = 4.5, fig.height = 4.5}
+tibble(
+  age      = plot_ages,
+  analytic = as.numeric(qx_an_e[s]),
+  sim      = as.numeric(qx_sim_e[s])
+) %>%
+  ggplot(aes(x = analytic, y = sim)) +
+  geom_point() +
+  geom_abline(slope = 1, color = "red", linetype = "dashed") +
+  cowplot::theme_cowplot() +
+  labs(x = "qx — analytic", y = "qx — simulation", title = "Alignment check")
+```
+
+
+## Three-curve plot: no error, with error (analytic), with error (sim)
+
+```{r three-curves, fig.width = 7, fig.height = 4.5}
+## Life table from sim ages with NO error applied
+Dx_sim_clean <- round(as.integer(table(factor(ages_sim, levels = age_full))) * scale)
+lx_sim_clean <- rev(cumsum(rev(Dx_sim_clean)))
+qx_sim_clean <- setNames(Dx_sim_clean / lx_sim_clean, age_full)
+
+tibble(
+  age                        = plot_ages,
+  `No error (sim)`           = as.numeric(qx_sim_clean[as.character(plot_ages)]),
+  `With error (analytic)`    = as.numeric(qx_an_e[s]),
+  `With error (sim)`         = as.numeric(qx_sim_e[s])
+) %>%
+  pivot_longer(-age, names_to = "curve", values_to = "qx") %>%
+  mutate(curve = factor(curve, levels = c(
+    "No error (sim)", "With error (analytic)", "With error (sim)"
+  ))) %>%
+  ggplot(aes(x = age, y = qx, color = curve, linetype = curve)) +
+  geom_line(linewidth = 1) +
+  scale_y_log10() +
+  scale_color_manual(values = c("steelblue", "black", "#D55E00")) +
+  scale_linetype_manual(values = c("solid", "solid", "dashed")) +
+  cowplot::theme_cowplot() +
+  labs(
+    x        = "Age",
+    y        = "q(x)  [log scale]",
+    color    = NULL,
+    linetype = NULL,
+    title    = "Effect of ±4 year age errors on mortality curve",
+    subtitle = sprintf(
+      "Gompertz a = %.0e, b = %.1f. Errors: ±4 yrs with prob 0.5 each.",
+      a, b
+    )
+  ) +
+  theme(legend.position = "bottom", plot.subtitle = element_text(size = 9))
+```
+
+
+## Rounding to nearest 0 or 5 (digit heaping on death age)
+
+```{r rounding, fig.width = 7, fig.height = 4.5}
+## Round a fraction p of ages to the nearest multiple of 5
+p_heap <- 0.6   ## 50% of ages heaped — exaggerated to make the effect visible
+ages_sim_rounded <- ifelse(
+  runif(N) < p_heap,
+  round(ages_sim / 5) * 5L,
+  ages_sim
+)
+
+Dx_sim_rounded <- round(as.integer(table(factor(ages_sim_rounded, levels = age_full))) * scale)
+lx_sim_rounded <- rev(cumsum(rev(Dx_sim_rounded)))
+qx_sim_rounded <- setNames(Dx_sim_rounded / lx_sim_rounded, age_full)
+
+s_full <- as.character(plot_ages)
+
+plot_df <- tibble(
+  age                 = plot_ages,
+  `No heaping`        = as.numeric(qx_sim_clean[s_full]),
+  `Heaped (p = 0.4)` = as.numeric(qx_sim_rounded[s_full])
+) %>%
+  pivot_longer(-age, names_to = "curve", values_to = "qx")
+
+## 5-year rolling average of the heaped curve
+rolling_avg <- plot_df %>%
+  filter(curve == "Heaped (p = 0.4)") %>%
+  arrange(age) %>%
+  mutate(
+    qx_roll = zoo::rollmean(qx, k = 5, fill = NA, align = "center"),
+    curve   = "Heaped — 5yr rolling avg"
+  ) %>%
+  select(age, curve, qx = qx_roll)
+
+bind_rows(plot_df, rolling_avg) %>%
+  mutate(curve = factor(curve, levels = c(
+    "No heaping", "Heaped (p = 0.4)", "Heaped — 5yr rolling avg"
+  ))) %>%
+  ggplot(aes(x = age, y = qx, color = curve, linetype = curve)) +
+  geom_line(linewidth = 1) +
+  scale_y_log10() +
+  scale_color_manual(values = c("steelblue", "#D55E00", "#D55E00")) +
+  scale_linetype_manual(values = c("solid", "solid", "dashed")) +
+  cowplot::theme_cowplot() +
+  labs(
+    x        = "Age",
+    y        = "q(x)",
+    color    = NULL,
+    linetype = NULL
+    ) +
+  theme(legend.position = "bottom", plot.subtitle = element_text(size = 9))
+```

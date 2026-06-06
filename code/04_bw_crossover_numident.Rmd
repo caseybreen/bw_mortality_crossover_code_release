@@ -233,7 +233,10 @@ qx_uncertainty_point_estimate_numident_women <- qx_uncertainty %>%
 
 # Plot
 pooled_bwcrossover_women <- qx_uncertainty_point_estimate_numident_women %>%
-  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  filter(death_age %in% 75:100, race %in% c("White", "Black")) %>%
+  mutate(race = case_when(
+    race == "White" ~ "White Women",
+    race == "Black" ~ "Black Women")) %>% 
   ggplot(aes(x = death_age, y = qx, color = race)) +
   geom_line() +
   geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
@@ -300,7 +303,10 @@ qx_uncertainty_point_estimate_numident_men <- qx_uncertainty %>%
 
 # Plot
 pooled_bwcrossover_men <- qx_uncertainty_point_estimate_numident_men %>%
-  filter(death_age %in% 75:100, race %in% c("White Americans", "Black Americans")) %>%
+  filter(death_age %in% 75:100, race %in% c("White", "Black")) %>%
+    mutate(race = case_when(
+    race == "White" ~ "White Men",
+    race == "Black" ~ "Black Men")) %>% 
   ggplot(aes(x = death_age, y = qx, color = race)) +
   geom_line() +
   geom_pointrange(aes(ymin = lower_ci, ymax = upper_ci, shape = race), size = 0.75, fill = "white") +
@@ -332,7 +338,7 @@ pooled_bwcrossover_men <- qx_uncertainty_point_estimate_numident_men %>%
 crossover_censoc_numident <- cowplot::plot_grid(bunmd_women, bunmd_men, pooled_bwcrossover_women, pooled_bwcrossover_men, labels = "AUTO")
 
 # Save plots 
-ggsave(plot = crossover_censoc_numident, filename = here("figures", "appendix_bw_crossover_numident.png"), width = 11, height = 9, bg = "white")
+ggsave(plot = crossover_censoc_numident, filename = here("figures", "fig7_bw_crossover_numident.png"), width = 11, height = 9, bg = "white")
 ```
 
 
